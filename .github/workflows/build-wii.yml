@@ -42,10 +42,11 @@ jobs:
 
       - name: Install elf2dol tool
         run: |
-          curl -fsSL -o elf2dol.tar.gz \
-            https://github.com/devkitPro/elf2dol/archive/refs/heads/master.tar.gz
-          sudo tar -xzf elf2dol.tar.gz -C /tmp
-          sudo make -C /tmp/elf2dol-master install
+          curl -fsSL -o gamecube-tools.tar.gz \
+            https://github.com/devkitPro/gamecube-tools/archive/refs/heads/master.tar.gz
+          sudo tar -xzf gamecube-tools.tar.gz -C /tmp
+          sudo make -C /tmp/gamecube-tools-master/elftool
+          sudo cp /tmp/gamecube-tools-master/elftool/elf2dol /usr/local/bin/elf2dol
 
       - name: Install libogc (headers + libs for Wii)
         run: |
