@@ -45,8 +45,8 @@ jobs:
           curl -fsSL -o gamecube-tools.tar.gz \
             https://github.com/devkitPro/gamecube-tools/archive/refs/heads/master.tar.gz
           sudo tar -xzf gamecube-tools.tar.gz -C /tmp
-          sudo make -C /tmp/gamecube-tools-master/elftool
-          sudo cp /tmp/gamecube-tools-master/elftool/elf2dol /usr/local/bin/elf2dol
+          gcc /tmp/gamecube-tools-master/elftool/elf2dol.c -o /tmp/elf2dol
+          sudo cp /tmp/elf2dol /usr/local/bin/elf2dol
 
       - name: Install libogc (headers + libs for Wii)
         run: |
