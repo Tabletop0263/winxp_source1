@@ -40,6 +40,13 @@ jobs:
           sudo cp /tmp/devkitppc-rules-master/base_rules /opt/devkitpro/devkitPPC/base_rules
           sudo cp /tmp/devkitppc-rules-master/base_tools /opt/devkitpro/devkitPPC/base_tools
 
+      - name: Install elf2dol tool
+        run: |
+          curl -fsSL -o elf2dol.tar.gz \
+            https://github.com/devkitPro/elf2dol/archive/refs/heads/master.tar.gz
+          sudo tar -xzf elf2dol.tar.gz -C /tmp
+          sudo make -C /tmp/elf2dol-master install
+
       - name: Install libogc (headers + libs for Wii)
         run: |
           curl -fsSL -o libogc.pkg.tar.xz \
