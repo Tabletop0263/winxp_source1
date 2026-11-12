@@ -27,7 +27,7 @@ jobs:
         run: |
           # Download devkitPPC release (r35, Oct 2024)
           curl -fsSL -o devkitppc.tar.xz \
-            https://github.com/devkitPro/devkitpro-pkgbuild/releases/download/r35/devkitppc-r35-linux.tar.xz
+            https://wii.leseratte10.de/devkitPro/devkitPPC/r35/devkitPPC_r35-linux.tar.xz
           sudo mkdir -p /opt/devkitpro
           sudo tar -xJf devkitppc.tar.xz -C /opt/devkitpro
           echo "DEVKITPPC=/opt/devkitpro/devkitPPC" >> $GITHUB_ENV
