@@ -111,6 +111,10 @@ KeInitializeKernelPpc(
     HalpDisplayPrintf("Kernel initialized. Boot phase complete.\r\n");
     HalpDisplayPrintf("Entry: _start at 0x1B84\r\n");
 
+    /* Initialize the Wii/GameCube PAD (Serial Interface) controller. */
+    HalpControllerInit();
+    HalpDisplayPrintf("Controller input initialized.\r\n");
+
     /* Decrementer/timebase initialization:
      * Program SPR_DEC from the loader-block-discovered clock rate so the
      * system tick fires at the correct interval, then enable external

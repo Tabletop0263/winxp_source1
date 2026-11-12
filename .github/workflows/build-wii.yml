@@ -176,7 +176,7 @@ jobs:
           done
 
           # Compile HAL C files
-          for f in halppc atomic interrupt context of display font8x8; do
+          for f in halppc atomic interrupt context of display font8x8 pad; do
             powerpc64le-linux-gnu-gcc -m32 -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding -nostdinc \
               -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
               -I../../ntos/inc/ppc -I../../ntos/inc -I../../ntdll/ppc \
@@ -187,7 +187,7 @@ jobs:
           # Link ELF32 little-endian executable
           powerpc64le-linux-gnu-ld -m elf32lppc -Ttext 0x00000000 -nostdlib -static \
             -o ntoskrnl_le.elf \
-            obj_le/hal_halppc.o obj_le/hal_atomic.o obj_le/hal_interrupt.o obj_le/hal_context.o obj_le/hal_of.o obj_le/hal_display.o obj_le/hal_font8x8.o \
+            obj_le/hal_halppc.o obj_le/hal_atomic.o obj_le/hal_interrupt.o obj_le/hal_context.o obj_le/hal_of.o obj_le/hal_display.o obj_le/hal_font8x8.o obj_le/hal_pad.o \
             obj_le/ntdll_context.o obj_le/ntdll_dispatch.o obj_le/ntdll_critsect.o obj_le/ntdll_ldrctx.o obj_le/ntdll_ldrthunk.o obj_le/ntdll_npxnp.o \
             obj_le/ppcinit.o obj_le/exceptn.o obj_le/pcr.o obj_le/ntos_ppc.o obj_le/ntoskrnl.o obj_le/ntos_entry.o
 

@@ -92,10 +92,12 @@ typedef unsigned long  ULONG;
 typedef unsigned long  ULONG_PTR;
 typedef unsigned char  UCHAR;
 typedef unsigned short USHORT;
+typedef short          SHORT;
 typedef long           LONG;
 typedef void           VOID;
 typedef void          *PVOID;
 typedef char           CHAR;
+typedef int            BOOLEAN;
 typedef unsigned long  KAFFINITY;
 typedef unsigned char  KIRQL;
 typedef long           KPRIORITY;
@@ -345,6 +347,14 @@ VOID HalpPutChar(IN CHAR Ch);
 VOID HalpPutString(IN const CHAR *Str);
 VOID HalpSetColors(IN ULONG FgColor, IN ULONG BgColor);
 VOID HalpDisplayPrintf(IN const CHAR *Fmt, ...);
+
+/*--------------------------------------------------------------------------
+    Controller input (hals/halppc/ppc/pad.c).
+--------------------------------------------------------------------------*/
+typedef struct _CONTROLLER_STATE CONTROLLER_STATE, *PCONTROLLER_STATE;
+VOID HalpControllerInit(VOID);
+VOID HalpGetControllerState(OUT PCONTROLLER_STATE State);
+ULONG HalpControllerMapButton(IN ULONG PadButtons);
 
 /*--------------------------------------------------------------------------
     Inline SPR/MSR accessors (shared between HAL and kernel).
