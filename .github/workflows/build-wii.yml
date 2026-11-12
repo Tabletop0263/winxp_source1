@@ -25,12 +25,19 @@ jobs:
 
       - name: Install devkitPPC (powerpc-eabi toolchain + libogc)
         run: |
-          # Download devkitPPC release (r35, Oct 2024)
+          # Download devkitPPC r35 (mirror, since GitHub releases removed old assets)
           curl -fsSL -o devkitppc.tar.xz \
             https://wii.leseratte10.de/devkitPro/devkitPPC/r35/devkitPPC_r35-linux.tar.xz
           sudo mkdir -p /opt/devkitpro
           sudo tar -xJf devkitppc.tar.xz -C /opt/devkitpro
           echo "DEVKITPPC=/opt/devkitpro/devkitPPC" >> $GITHUB_ENV
+
+      - name: Install libogc (provides wii_rules for arcldr Makefile.wii)
+        run: |
+          curl -fsSL -o libogc.tar.gz \
+            "https://wii.leseratte10.de/devkitPro/libogc/libogc_1.8.12%20(2014-04-02)/libogc-1.8.12.tar.gz"
+          sudo tar -xzf libogc.tar.gz -C /opt/devkitpro
+          echo "LIBOGC_ROOT=/opt/devkitpro/libogc" >> $GITHUB_ENV
 
       - name: Install build dependencies
         run: |
@@ -137,4 +144,3 @@ EOF
           name: wii-sd-package
           path: wii_sd/
           retention-days: 7
-trigger
