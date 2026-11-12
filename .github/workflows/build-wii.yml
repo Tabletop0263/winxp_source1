@@ -26,40 +26,60 @@ jobs:
 
       - name: Install devkitPPC r35 (powerpc-eabi toolchain)
         run: |
+          set -euxo pipefail
+          echo "=== Downloading devkitPPC r35 ==="
           curl -fsSL -o devkitppc.tar.xz \
             https://wii.leseratte10.de/devkitPro/devkitPPC/r35/devkitPPC_r35-linux.tar.xz
+          echo "=== Extracting devkitPPC ==="
           sudo mkdir -p /opt/devkitpro
           sudo tar -xJf devkitppc.tar.xz -C /opt/devkitpro
           echo "DEVKITPPC=/opt/devkitpro/devkitPPC" >> $GITHUB_ENV
+          echo "=== devkitPPC installed ==="
+          ls /opt/devkitpro/devkitPPC/bin/powerpc-eabi-gcc
 
       - name: Install devkitppc-rules (wii_rules, base_rules, base_tools)
         run: |
+          set -euxo pipefail
+          echo "=== Downloading devkitppc-rules ==="
           curl -fsSL -o devkitppc-rules.tar.gz \
             https://github.com/devkitPro/devkitppc-rules/archive/refs/heads/master.tar.gz
           sudo tar -xzf devkitppc-rules.tar.gz -C /tmp
           sudo cp /tmp/devkitppc-rules-master/wii_rules /opt/devkitpro/devkitPPC/wii_rules
           sudo cp /tmp/devkitppc-rules-master/base_rules /opt/devkitpro/devkitPPC/base_rules
           sudo cp /tmp/devkitppc-rules-master/base_tools /opt/devkitpro/devkitPPC/base_tools
+          echo "=== Rules installed ==="
+          ls /opt/devkitpro/devkitPPC/wii_rules
 
       - name: Install elf2dol tool
         run: |
+          set -euxo pipefail
+          echo "=== Downloading gamecube-tools ==="
           curl -fsSL -o gamecube-tools.tar.gz \
             https://github.com/devkitPro/gamecube-tools/archive/refs/heads/master.tar.gz
           sudo tar -xzf gamecube-tools.tar.gz -C /tmp
           gcc /tmp/gamecube-tools-master/elftool/elf2dol.c -o /tmp/elf2dol
           sudo cp /tmp/elf2dol /usr/local/bin/elf2dol
+          echo "=== elf2dol installed ==="
+          which elf2dol
+          elf2dol 2>&1 | head -1
 
       - name: Install libogc (headers + libs for Wii)
         run: |
+          set -euxo pipefail
+          echo "=== Downloading libogc ==="
           curl -fsSL -o libogc.pkg.tar.xz \
             "https://wii.leseratte10.de/devkitPro/libogc/libogc_2.0.0%20(2020-06-11)/libogc-2.0.0-2-any.pkg.tar.xz"
           sudo tar -xJf libogc.pkg.tar.xz -C /
           echo "DEVKITPRO=/opt/devkitpro" >> $GITHUB_ENV
           echo "LIBOGC_INC=/opt/devkitpro/libogc/include" >> $GITHUB_ENV
           echo "LIBOGC_LIB=/opt/devkitpro/libogc/lib/wii" >> $GITHUB_ENV
+          echo "=== libogc installed ==="
+          ls /opt/devkitpro/libogc/lib/wii/libogc.a
 
       - name: Install libfat source (for fat.h header)
         run: |
+          set -euxo pipefail
+          echo "=== Downloading libfat ==="
           curl -fsSL -o libfat.tar.gz \
             https://github.com/devkitPro/libfat/archive/master.tar.gz
           sudo tar -xzf libfat.tar.gz -C /tmp
@@ -68,8 +88,8 @@ jobs:
           echo '#define LIBFAT_VERSION_MAJOR 1' | sudo tee -a /opt/devkitpro/libogc/include/libfatversion.h > /dev/null
           echo '#define LIBFAT_VERSION_MINOR 0' | sudo tee -a /opt/devkitpro/libogc/include/libfatversion.h > /dev/null
           # libfat.a stub (arcldr links against it but doesn't use FAT at runtime)
+          echo "=== Creating libfat.a stub ==="
           sudo rm -f /opt/devkitpro/libogc/lib/wii/libfat.a
-          # Add fatMount stub symbol needed by arcldr
           printf 'int fatMount(void *a, void *b) { return 0; }\n' > /tmp/fatmount_stub.c
           sudo /opt/devkitpro/devkitPPC/bin/powerpc-eabi-gcc -c /tmp/fatmount_stub.c -o /tmp/fatmount_stub.o
           sudo /opt/devkitpro/devkitPPC/bin/powerpc-eabi-ar rcs /opt/devkitpro/libogc/lib/wii/libfat.a /tmp/fatmount_stub.o
@@ -77,31 +97,57 @@ jobs:
           # Add _SHIFTL/_SHIFTR macros missing from this libogc version
           echo '#define _SHIFTL(v,s,w) (((v) & ((1 << (w)) - 1)) << (s))' | sudo tee -a /opt/devkitpro/libogc/include/gccore.h > /dev/null
           echo '#define _SHIFTR(v,s,w) (((v) >> (s)) & ((1 << (w)) - 1))' | sudo tee -a /opt/devkitpro/libogc/include/gccore.h > /dev/null
+          echo "=== libfat stub done ==="
+          /opt/devkitpro/devkitPPC/bin/powerpc-eabi-nm /opt/devkitpro/libogc/lib/wii/libfat.a | grep fatMount
 
       - name: Install build dependencies
         run: |
+          set -euxo pipefail
           sudo apt-get update
-          sudo apt-get install -y make wget curl xz-utils
+          sudo apt-get install -y make wget curl xz-utils gcc
 
       - name: Build arcldr for Wii (DOL)
         working-directory: entii/arcldr
         run: |
+          set -euxo pipefail
           export DEVKITPPC=/opt/devkitpro/devkitPPC
           export DEVKITPRO=/opt/devkitpro
           export PATH="$DEVKITPPC/bin:$PATH"
-          # Patch _Static_assert for GCC 8.3 (single-arg needs C23)
+          echo "=== Environment ==="
+          echo "DEVKITPPC=$DEVKITPPC"
+          echo "DEVKITPRO=$DEVKITPRO"
+          echo "PATH=$PATH"
+          which powerpc-eabi-gcc
+          which elf2dol
+          echo "=== Checking hwdesc.h path ==="
+          ls -la ../inc/hwdesc.h
+          echo "=== Patching _Static_assert ==="
           sed -i 's/_Static_assert((sizeof(HW_DESCRIPTION) % sizeof(unsigned long long)) == 0);/_Static_assert((sizeof(HW_DESCRIPTION) % sizeof(unsigned long long)) == 0, "");/' ../inc/hwdesc.h
-          make -f Makefile.wii
+          grep -n "_Static_assert" ../inc/hwdesc.h
+          echo "=== Building arcldr ==="
+          make -f Makefile.wii V=1
+          echo "=== arcldr build complete ==="
           ls -la arcldr_rvl.dol arcldr_rvl.elf
 
       - name: Install LE PowerPC cross-compiler for XP kernel
         run: |
+          set -euxo pipefail
           sudo apt-get update
           sudo apt-get install -y gcc-powerpc64le-linux-gnu binutils-powerpc64le-linux-gnu
+          echo "=== LE cross-compiler installed ==="
+          which powerpc64le-linux-gnu-gcc
+          which powerpc64le-linux-gnu-ld
 
       - name: Build XP kernel (little-endian ELF32)
         working-directory: winxp_source/Source/XPSP1/NT/base/build/ppc
         run: |
+          set -euxo pipefail
+          echo "=== Working directory ==="
+          pwd
+          ls -la
+          echo "=== Source files check ==="
+          ls ../../ntos/ppc/ppc.S
+          ls ntos_entry.S
           rm -rf obj_le && mkdir obj_le
 
           # Assemble entry + vector stubs (ELF32 LE via gcc driver)
@@ -147,6 +193,8 @@ jobs:
 
       - name: Package Wii SD card layout
         run: |
+          set -euxo pipefail
+          echo "=== Packaging ==="
           mkdir -p wii_sd/nt
           mkdir -p wii_sd/apps/arcldr
           cp entii/arcldr/arcldr_rvl.dol wii_sd/apps/arcldr/boot.dol
@@ -181,6 +229,8 @@ sd:/nt/arcfw.elf           - XP kernel (little-endian ELF, entry via ModeSwitchE
 - arcldr requires a Wii with Homebrew Channel installed.
 - The kernel expects entii's PHW_DESCRIPTION loader block in GPR r3.
 EOF
+          echo "=== Package complete ==="
+          ls -la wii_sd/ wii_sd/apps/arcldr/ wii_sd/nt/
 
       - name: Upload Wii SD card package
         uses: actions/upload-artifact@v4
