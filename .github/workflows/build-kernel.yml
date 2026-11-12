@@ -1,0 +1,130 @@
+name: Build XP Kernel for Broadway (little-endian)
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout winxp_source
+        uses: actions/checkout@v4
+        with:
+          repository: DeDf/winxp_source
+          path: winxp_source
+
+      - name: Install little-endian PowerPC cross-compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-powerpc64le-linux-gnu binutils-powerpc64le-linux-gnu
+
+      - name: Build kernel (little-endian ELF32)
+        working-directory: winxp_source/Source/XPSP1/NT/base/build/ppc
+        run: |
+          rm -rf obj_le && mkdir obj_le
+
+          # Assemble entry + vector stubs (ELF32 LE via gcc driver)
+          powerpc64le-linux-gnu-gcc -m32 -c ../../ntos/ppc/ppc.S -o obj_le/ntos_ppc.o
+          powerpc64le-linux-gnu-gcc -m32 -c ntos_entry.S -o obj_le/ntos_entry.o
+
+          # Compile ntos C files
+          powerpc64le-linux-gnu-gcc -m32 -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding -nostdinc \
+            -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
+            -I../../ntos/inc/ppc -I../../ntos/inc -I../../ntdll/ppc \
+            -I./inc_stub \
+            -c ../../ntos/ppc/ntoskrnl.c -o obj_le/ntoskrnl.o
+          powerpc64le-linux-gnu-gcc -m32 -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding -nostdinc \
+            -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
+            -I../../ntos/inc/ppc -I../../ntos/inc -I../../ntdll/ppc \
+            -I./inc_stub \
+            -c ../../ntos/ppc/ppcinit.c -o obj_le/ppcinit.o
+          powerpc64le-linux-gnu-gcc -m32 -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding -nostdinc \
+            -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
+            -I../../ntos/inc/ppc -I../../ntos/inc -I../../ntdll/ppc \
+            -I./inc_stub \
+            -c ../../ntos/ppc/exceptn.c -o obj_le/exceptn.o
+          powerpc64le-linux-gnu-gcc -m32 -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding -nostdinc \
+            -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
+            -I../../ntos/inc/ppc -I../../ntos/inc -I../../ntdll/ppc \
+            -I./inc_stub \
+            -c ../../ntos/ppc/pcr.c -o obj_le/pcr.o
+
+          # Compile ntdll C files
+          powerpc64le-linux-gnu-gcc -m32 -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding -nostdinc \
+            -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
+            -I../../ntos/inc/ppc -I../../ntos/inc -I../../ntdll/ppc \
+            -I./inc_stub \
+            -c ../../ntdll/ppc/context.c -o obj_le/ntdll_context.o
+          powerpc64le-linux-gnu-gcc -m32 -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding -nostdinc \
+            -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
+            -I../../ntos/inc/ppc -I../../ntos/inc -I../../ntdll/ppc \
+            -I./inc_stub \
+            -c ../../ntdll/ppc/critsect.c -o obj_le/ntdll_critsect.o
+          powerpc64le-linux-gnu-gcc -m32 -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding -nostdinc \
+            -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
+            -I../../ntos/inc/ppc -I../../ntos/inc -I../../ntdll/ppc \
+            -I./inc_stub \
+            -c ../../ntdll/ppc/dispatch.c -o obj_le/ntdll_dispatch.o
+          powerpc64le-linux-gnu-gcc -m32 -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding -nostdinc \
+            -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
+            -I../../ntos/inc/ppc -I../../ntos/inc -I../../ntdll/ppc \
+            -I./inc_stub \
+            -c ../../ntdll/ppc/ldrctx.c -o obj_le/ntdll_ldrctx.o
+          powerpc64le-linux-gnu-gcc -m32 -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding -nostdinc \
+            -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
+            -I../../ntos/inc/ppc -I../../ntos/inc -I../../ntdll/ppc \
+            -I./inc_stub \
+            -c ../../ntdll/ppc/ldrthunk.c -o obj_le/ntdll_ldrthunk.o
+          powerpc64le-linux-gnu-gcc -m32 -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding -nostdinc \
+            -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
+            -I../../ntos/inc/ppc -I../../ntos/inc -I../../ntdll/ppc \
+            -I./inc_stub \
+            -c ../../ntdll/ppc/npxnp.c -o obj_le/ntdll_npxnp.o
+
+          # Compile HAL C files
+          powerpc64le-linux-gnu-gcc -m32 -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding -nostdinc \
+            -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
+            -I../../ntos/inc/ppc -I../../ntos/inc -I../../ntdll/ppc \
+            -I../../hals/halppc/ppc -I./inc_stub \
+            -c ../../hals/halppc/ppc/halppc.c -o obj_le/hal_halppc.o
+          powerpc64le-linux-gnu-gcc -m32 -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding -nostdinc \
+            -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
+            -I../../ntos/inc/ppc -I../../ntos/inc -I../../ntdll/ppc \
+            -I../../hals/halppc/ppc -I./inc_stub \
+            -c ../../hals/halppc/ppc/atomic.c -o obj_le/hal_atomic.o
+          powerpc64le-linux-gnu-gcc -m32 -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding -nostdinc \
+            -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
+            -I../../ntos/inc/ppc -I../../ntos/inc -I../../ntdll/ppc \
+            -I../../hals/halppc/ppc -I./inc_stub \
+            -c ../../hals/halppc/ppc/interrupt.c -o obj_le/hal_interrupt.o
+          powerpc64le-linux-gnu-gcc -m32 -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding -nostdinc \
+            -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
+            -I../../ntos/inc/ppc -I../../ntos/inc -I../../ntdll/ppc \
+            -I../../hals/halppc/ppc -I./inc_stub \
+            -c ../../hals/halppc/ppc/context.c -o obj_le/hal_context.o
+          powerpc64le-linux-gnu-gcc -m32 -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding -nostdinc \
+            -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
+            -I../../ntos/inc/ppc -I../../ntos/inc -I../../ntdll/ppc \
+            -I../../hals/halppc/ppc -I./inc_stub \
+            -c ../../hals/halppc/ppc/of.c -o obj_le/hal_of.o
+
+          # Link ELF32 little-endian executable
+          powerpc64le-linux-gnu-ld -m elf32lppc -Ttext 0x00000000 -nostdlib -static \
+            -o ntoskrnl_le.elf \
+            obj_le/hal_halppc.o obj_le/hal_atomic.o obj_le/hal_interrupt.o obj_le/hal_context.o obj_le/hal_of.o \
+            obj_le/ntdll_context.o obj_le/ntdll_dispatch.o obj_le/ntdll_critsect.o obj_le/ntdll_ldrctx.o obj_le/ntdll_ldrthunk.o obj_le/ntdll_npxnp.o \
+            obj_le/ppcinit.o obj_le/exceptn.o obj_le/pcr.o obj_le/ntos_ppc.o obj_le/ntoskrnl.o obj_le/ntos_entry.o
+
+          powerpc64le-linux-gnu-readelf -h ntoskrnl_le.elf | grep -E "Class|Data|Machine|Type|Entry"
+          powerpc64le-linux-gnu-nm ntoskrnl_le.elf | grep " U " | wc -l | xargs echo "undefined symbols:"
+
+      - name: Upload kernel ELF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ntoskrnl-le-elf
+          path: winxp_source/Source/XPSP1/NT/base/build/ppc/ntoskrnl_le.elf
+          retention-days: 7

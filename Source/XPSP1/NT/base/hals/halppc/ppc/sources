@@ -1,0 +1,26 @@
+!IF 0
+
+Copyright (c) Microsoft Corporation
+
+!ENDIF
+
+!include ..\..\..\..\sources.inc
+
+TARGETNAME=halppc
+TARGETPATH=obj
+TARGETTYPE=HAL
+
+# Compiler: powerpc-linux-gnu-gcc -mcpu=750 -mno-altivec (PowerPC ELF32 / Broadway G3)
+CC=powerpc-linux-gnu-gcc
+
+C_DEFINES=-DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL
+
+INCLUDES=$(INCLUDES);..\..\..\..\inc;..\..\..\..\halppc\ppc
+
+SOURCES=$(CSOURCES) \
+    halppc.c \
+    atomic.c \
+    interrupt.c
+
+ASMSOURCES=$(ASMSOURCES) \
+    context.S

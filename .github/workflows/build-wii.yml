@@ -1,0 +1,139 @@
+name: Build arcldr + XP kernel for Wii
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout winxp_source
+        uses: actions/checkout@v4
+        with:
+          repository: DeDf/winxp_source
+          path: winxp_source
+
+      - name: Checkout entii
+        uses: actions/checkout@v4
+        with:
+          repository: Wack0/entii-for-workcubes
+          path: entii
+
+      - name: Install devkitPPC (powerpc-eabi toolchain + libogc)
+        run: |
+          # Download devkitPPC release (r35, Oct 2024)
+          curl -fsSL -o devkitppc.tar.xz \
+            https://github.com/devkitPro/devkitpro-pkgbuild/releases/download/r35/devkitppc-r35-linux.tar.xz
+          sudo mkdir -p /opt/devkitpro
+          sudo tar -xJf devkitppc.tar.xz -C /opt/devkitpro
+          echo "DEVKITPPC=/opt/devkitpro/devkitPPC" >> $GITHUB_ENV
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make wget curl xz-utils
+
+      - name: Build arcldr for Wii (DOL)
+        working-directory: entii/arcldr
+        run: |
+          make -f Makefile.wii
+          ls -la arcldr_rvl.dol arcldr_rvl.elf
+
+      - name: Install LE PowerPC cross-compiler for XP kernel
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-powerpc64le-linux-gnu binutils-powerpc64le-linux-gnu
+
+      - name: Build XP kernel (little-endian ELF32)
+        working-directory: winxp_source/Source/XPSP1/NT/base/build/ppc
+        run: |
+          rm -rf obj_le && mkdir obj_le
+
+          # Assemble entry + vector stubs (ELF32 LE via gcc driver)
+          powerpc64le-linux-gnu-gcc -m32 -c ../../ntos/ppc/ppc.S -o obj_le/ntos_ppc.o
+          powerpc64le-linux-gnu-gcc -m32 -c ntos_entry.S -o obj_le/ntos_entry.o
+
+          # Compile ntos C files
+          for f in ntoskrnl ppcinit exceptn pcr; do
+            powerpc64le-linux-gnu-gcc -m32 -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding -nostdinc \
+              -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
+              -I../../ntos/inc/ppc -I../../ntos/inc -I../../ntdll/ppc \
+              -I./inc_stub \
+              -c ../../ntos/ppc/$f.c -o obj_le/$f.o
+          done
+
+          # Compile ntdll C files
+          for f in context critsect dispatch ldrctx ldrthunk npxnp; do
+            powerpc64le-linux-gnu-gcc -m32 -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding -nostdinc \
+              -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
+              -I../../ntos/inc/ppc -I../../ntos/inc -I../../ntdll/ppc \
+              -I./inc_stub \
+              -c ../../ntdll/ppc/$f.c -o obj_le/ntdll_$f.o
+          done
+
+          # Compile HAL C files
+          for f in halppc atomic interrupt context of; do
+            powerpc64le-linux-gnu-gcc -m32 -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding -nostdinc \
+              -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
+              -I../../ntos/inc/ppc -I../../ntos/inc -I../../ntdll/ppc \
+              -I../../hals/halppc/ppc -I./inc_stub \
+              -c ../../hals/halppc/ppc/$f.c -o obj_le/hal_$f.o
+          done
+
+          # Link ELF32 little-endian executable
+          powerpc64le-linux-gnu-ld -m elf32lppc -Ttext 0x00000000 -nostdlib -static \
+            -o ntoskrnl_le.elf \
+            obj_le/hal_halppc.o obj_le/hal_atomic.o obj_le/hal_interrupt.o obj_le/hal_context.o obj_le/hal_of.o \
+            obj_le/ntdll_context.o obj_le/ntdll_dispatch.o obj_le/ntdll_critsect.o obj_le/ntdll_ldrctx.o obj_le/ntdll_ldrthunk.o obj_le/ntdll_npxnp.o \
+            obj_le/ppcinit.o obj_le/exceptn.o obj_le/pcr.o obj_le/ntos_ppc.o obj_le/ntoskrnl.o obj_le/ntos_entry.o
+
+          powerpc64le-linux-gnu-readelf -h ntoskrnl_le.elf | grep -E "Class|Data|Machine|Type|Entry"
+          powerpc64le-linux-gnu-nm ntoskrnl_le.elf | grep " U " | wc -l | xargs echo "undefined symbols:"
+
+      - name: Package Wii SD card layout
+        run: |
+          mkdir -p wii_sd/nt
+          mkdir -p wii_sd/apps/arcldr
+          cp entii/arcldr/arcldr_rvl.dol wii_sd/apps/arcldr/boot.dol
+          cp winxp_source/Source/XPSP1/NT/base/build/ppc/ntoskrnl_le.elf wii_sd/nt/arcfw.elf
+          cat > wii_sd/README.md << 'EOF'
+# Wii SD Card Layout for XP Kernel Testing
+
+## Files on SD card:
+
+sd:/apps/arcldr/boot.dol   - entii arcldr loader (load via Homebrew Channel)
+sd:/nt/arcfw.elf           - XP kernel (little-endian ELF, entry via ModeSwitchEntry)
+
+## How to test:
+
+1. Copy the `wii_sd/` contents to the root of a FAT32 SD card.
+2. Insert the SD card into your Wii.
+3. Launch the Homebrew Channel.
+4. Run `arcldr` from the Homebrew Channel.
+5. arcldr will load `sd:/nt/arcfw.elf`, build the PHW_DESCRIPTION from your Wii's
+   hardware, and jump to the XP kernel's `_start` via `ModeSwitchEntry`.
+
+## What to expect:
+
+- No visible output yet (no framebuffer/display driver in the kernel).
+- The kernel initializes and spins waiting for interrupts.
+- If the Wii doesn't immediately crash/reboot, the entry convention and
+  PHW_DESCRIPTION plumbing are working.
+
+## Notes:
+
+- This is experimental early code. The kernel may hang or crash.
+- arcldr requires a Wii with Homebrew Channel installed.
+- The kernel expects entii's PHW_DESCRIPTION loader block in GPR r3.
+EOF
+
+      - name: Upload Wii SD card package
+        uses: actions/upload-artifact@v4
+        with:
+          name: wii-sd-package
+          path: wii_sd/
+          retention-days: 7

@@ -1,0 +1,26 @@
+!IF 0
+
+Copyright (c) Microsoft Corporation
+
+!ENDIF
+
+!include ..\..\..\..\sources.inc
+
+TARGETNAME=ntdll
+TARGETPATH=obj
+TARGETTYPE=DLL
+
+# Compiler: powerpc-linux-gnu-gcc -mcpu=750 -mno-altivec (PowerPC ELF32 / Broadway G3)
+CC=powerpc-linux-gnu-gcc
+
+C_DEFINES=-DPOWERPC -D_G3_ -DBROADWAY -DNT_USER -DNT_DLL
+
+INCLUDES=$(INCLUDES);..\..\..\..\inc;..\..\..\..\ntdll\ppc
+
+SOURCES=$(CSOURCES) \
+    context.c \
+    dispatch.c \
+    critsect.c \
+    ldrctx.c \
+    ldrthunk.c \
+    npxnp.c

@@ -1,0 +1,26 @@
+!IF 0
+
+Copyright (c) Microsoft Corporation
+
+!ENDIF
+
+!include ..\..\..\..\sources.inc
+
+TARGETNAME=ntoskrnl
+TARGETPATH=obj
+TARGETTYPE=DRIVER
+
+# Compiler: powerpc-linux-gnu-gcc -mcpu=750 -mno-altivec (PowerPC ELF32 / Broadway G3)
+CC=powerpc-linux-gnu-gcc
+
+C_DEFINES=-DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_
+
+INCLUDES=$(INCLUDES);..\..\inc\ppc;..\..\inc
+
+SOURCES=$(CSOURCES) \
+    ppcinit.c \
+    exceptn.c \
+    pcr.c
+
+ASMSOURCES=$(ASMSOURCES) \
+    ppc.S
