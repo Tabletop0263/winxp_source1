@@ -137,3 +137,4 @@ EOF
           name: wii-sd-package
           path: wii_sd/
           retention-days: 7
+trigger
