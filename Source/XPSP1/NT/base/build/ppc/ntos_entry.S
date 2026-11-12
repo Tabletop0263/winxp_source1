@@ -9,11 +9,14 @@
 #       and passes it to KeInitializeKernel().
 #    4. Calls KeInitializeKernel() (arch-independent entry in ntoskrnl.c)
 #       which performs phase setup and delegates to KeInitializeKernelPpc().
-#    5. Halts (waits for interrupts) once initialization is complete.
+#    5. Idles with external interrupts enabled, waiting for the Decrementer
+#       tick (vector 0x900) which is dispatched via HalpVectorEntry and
+#       returns via rfi.
 #
 #  Called via entii's ModeSwitchEntry: r3 = PHW_DESCRIPTION (K0 virtual addr).
 #
 #  Build: powerpc64le-linux-gnu-as -m32 -o ntos_entry.o ntos_entry.S
+#         (or via gcc driver with -m32 -mcpu=750 -mno-altivec)
 
         .text
 
@@ -126,7 +129,7 @@ KeLoaderBlock:
 #   r3 = PHW_DESCRIPTION loader block (from entii ModeSwitchEntry, K0 virtual)
 #   r2 = address of PCR storage (HalpPcrStorage)
 #   call KeInitializeKernel(r3)   # arch-independent entry (ntoskrnl.c)
-#   loop waiting for interrupts
+#   idle with interrupts enabled, waiting for the Decrementer tick (rfi return)
 #----------------------------------------------------------------------------
 _start:
         # Save the loader block pointer (r3) into KeLoaderBlock.
@@ -145,9 +148,18 @@ _start:
         # Call arch-independent kernel initialization (ntoskrnl.c)
         bl      KeInitializeKernel
 
-        # Idle: wait for interrupts (external interrupt enable already set
-        # by HalpInstallVectors; here we just spin with interrupts on)
-1:      nop                     # spin; a real port uses rfi to return
+        # Idle loop with external interrupts enabled.
+        # KeInitializeKernelPpc (HalpInstallVectors / HalpInitializeDecrementer)
+        # already set MSR.EE and programmed the Decrementer (vector 0x900).
+        # Spin here; each Decrementer tick is dispatched via
+        # HalpVectorEntry -> HalpInterruptEntry -> KiExceptionDispatch and
+        # returns to this loop via rfi.  A real port would schedule threads
+        # here instead of spinning.
+1:      # Re-enable external interrupts defensively (MSR.EE = 0x8000).
+        ori     0, 0, 0x8000      # MSR.EE
+        mtmsr   0
+        isync
+        nop                      # wait for interrupt (decrementer tick)
         b       1b
 
         .size   _start, .- _start

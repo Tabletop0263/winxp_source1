@@ -241,3 +241,10 @@ EOF
           name: wii-sd-package
           path: wii_sd/
           retention-days: 7
+
+      - name: Upload kernel ELF separately
+        uses: actions/upload-artifact@v4
+        with:
+          name: arcfw-kernel-elf
+          path: winxp_source/Source/XPSP1/NT/base/build/ppc/ntoskrnl_le.elf
+          retention-days: 7
