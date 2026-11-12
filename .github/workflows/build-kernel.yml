@@ -14,7 +14,7 @@ jobs:
       - name: Checkout winxp_source
         uses: actions/checkout@v4
         with:
-          repository: DeDf/winxp_source
+          repository: Tabletop0263/winxp_source1
           path: winxp_source
 
       - name: Install little-endian PowerPC cross-compiler
