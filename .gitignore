@@ -1,0 +1,6 @@
+# Build artifacts
+obj_le/
+*.o
+*.elf
+*.dol
+wii_sd/

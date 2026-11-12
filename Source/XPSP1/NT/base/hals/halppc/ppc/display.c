@@ -85,12 +85,12 @@ HalpDisplayInit(
 }
 
 /*--------------------------------------------------------------------------
-    HalpPixelWrite - write a 32-bit pixel to the framebuffer.
+    HalpPixelWrite - write a 16-bit RGB565 pixel to the framebuffer.
 
-    The framebuffer is assumed to be 32-bit RGBA8888 (as arcldr sets up
-    VI_DISPLAY_PIX_SZ based modes). We write in little-endian order since
-    the kernel is compiled little-endian and ModeSwitchEntry enables
-    MSR_ILE (little-endian mode) before jumping to us.
+    The framebuffer is RGB565 (2 bytes/pixel) as set up by arcldr via libogc
+    default video mode (VI_DISPLAY_PIX_SZ = 2). We write in little-endian
+    order since the kernel is compiled little-endian and ModeSwitchEntry
+    enables MSR_ILE (little-endian mode) before jumping to us.
 --------------------------------------------------------------------------*/
 static VOID
 HalpPixelWrite(
@@ -109,10 +109,11 @@ HalpPixelWrite(
         return;
     }
 
-    offset = Y * HalpFrameBufferStride + X * 4;
+    offset = Y * HalpFrameBufferStride + X * 2;
 
-    /* Write 32-bit pixel (little-endian). */
-    *(volatile unsigned long *)(HalpFrameBuffer + offset) = Color;
+    /* Write 16-bit pixel (little-endian): low byte first, then high byte. */
+    HalpFrameBuffer[offset]     = (unsigned char)(Color & 0xFF);
+    HalpFrameBuffer[offset + 1] = (unsigned char)((Color >> 8) & 0xFF);
 }
 
 /*--------------------------------------------------------------------------
