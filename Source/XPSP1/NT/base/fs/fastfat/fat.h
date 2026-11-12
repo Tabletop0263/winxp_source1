@@ -107,7 +107,7 @@ typedef PACKED_BIOS_PARAMETER_BLOCK_EX *PPACKED_BIOS_PARAMETER_BLOCK_EX;
 //  does not matter.
 //
 
-#define IsBpbFat32(bpb) (*(USHORT *)(&(bpb)->SectorsPerFat) == 0)
+#define IsBpbFat32(bpb) (((bpb)->SectorsPerFat[0] == 0) && ((bpb)->SectorsPerFat[1] == 0))
 
 typedef struct BIOS_PARAMETER_BLOCK {
     USHORT BytesPerSector;
@@ -586,14 +586,17 @@ typedef DIRENT *PDIRENT;
 #define FatSet12BitEntry(FAT,INDEX,ENTRY) {                            \
                                                                        \
     FAT_ENTRY TmpFatEntry;                                             \
+    PUCHAR _FatDst;                                                    \
                                                                        \
     CopyUchar2((PUCHAR)&TmpFatEntry, (PUCHAR)(FAT) + (INDEX) * 3 / 2); \
                                                                        \
     TmpFatEntry = (FAT_ENTRY)                                          \
-                (((INDEX) & 1) ? ((ENTRY) << 4) | (TmpFatEntry & 0xf)  \
-                               : (ENTRY) | (TmpFatEntry & 0xf000));    \
+            (((INDEX) & 1) ? ((ENTRY) << 4) | (TmpFatEntry & 0xf)      \
+                           : (ENTRY) | (TmpFatEntry & 0xf000));        \
                                                                        \
-    *((UNALIGNED UCHAR2 *)((PUCHAR)(FAT) + (INDEX) * 3 / 2)) = *((UNALIGNED UCHAR2 *)(&TmpFatEntry)); \
+    _FatDst = (PUCHAR)(FAT) + (INDEX) * 3 / 2;                         \
+    _FatDst[0] = ((PUCHAR)&TmpFatEntry)[0];                            \
+    _FatDst[1] = ((PUCHAR)&TmpFatEntry)[1];                            \
 }
 
 //

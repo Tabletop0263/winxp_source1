@@ -1291,8 +1291,7 @@ Return Value:
         //  times that are the same as the LastWriteTime.
         //
 
-        if (*((UNALIGNED LONG *)&Dirent->CreationTime) ==
-            *((UNALIGNED LONG *)&Dirent->LastWriteTime)) {
+        if (RtlEqualMemory(&Dirent->CreationTime, &Dirent->LastWriteTime, sizeof(Dirent->CreationTime))) {
 
             DirInfo->CreationTime.QuadPart =
 

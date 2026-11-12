@@ -1964,7 +1964,10 @@ typedef union _UCHAR4 {
 //
 
 #define CopyUchar2(Dst,Src) {                                \
-    *((UCHAR2 *)(Dst)) = *((UNALIGNED UCHAR2 *)(Src)); \
+    PUCHAR2 _d = (PUCHAR2)(Dst);                             \
+    PUCHAR _s = (PUCHAR)(Src);                               \
+    _d->Uchar[0] = _s[0];                                    \
+    _d->Uchar[1] = _s[1];                                    \
     }
 
 //
@@ -1972,11 +1975,21 @@ typedef union _UCHAR4 {
 //
 
 #define CopyUchar4(Dst,Src) {                                \
-    *((UCHAR4 *)(Dst)) = *((UNALIGNED UCHAR4 *)(Src)); \
+    PUCHAR4 _d = (PUCHAR4)(Dst);                             \
+    PUCHAR _s = (PUCHAR)(Src);                               \
+    _d->Uchar[0] = _s[0];                                    \
+    _d->Uchar[1] = _s[1];                                    \
+    _d->Uchar[2] = _s[2];                                    \
+    _d->Uchar[3] = _s[3];                                    \
     }
 
 #define CopyU4char(Dst,Src) {                                \
-    *((UNALIGNED UCHAR4 *)(Dst)) = *((UCHAR4 *)(Src)); \
+    PUCHAR4 _s = (PUCHAR4)(Src);                             \
+    PUCHAR _d = (PUCHAR)(Dst);                               \
+    _d[0] = _s->Uchar[0];                                    \
+    _d[1] = _s->Uchar[1];                                    \
+    _d[2] = _s->Uchar[2];                                    \
+    _d[3] = _s->Uchar[3];                                    \
     }
 
 //

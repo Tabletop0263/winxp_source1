@@ -1537,10 +1537,10 @@ Return Value:
                     //
 
                     if (!FlagOn((*Dirent)->Attributes, FAT_DIRENT_ATTR_VOLUME_ID) &&
-                        (*(PULONG)&(Ccb->OemQueryTemplate.Constant[0]) == *(PULONG)&((*Dirent)->FileName[0])) &&
-                        (*(PULONG)&(Ccb->OemQueryTemplate.Constant[4]) == *(PULONG)&((*Dirent)->FileName[4])) &&
-                        (*(PUSHORT)&(Ccb->OemQueryTemplate.Constant[8]) == *(PUSHORT)&((*Dirent)->FileName[8])) &&
-                        (*(PUCHAR)&(Ccb->OemQueryTemplate.Constant[10]) == *(PUCHAR)&((*Dirent)->FileName[10]))) {
+                        RtlEqualMemory(&(Ccb->OemQueryTemplate.Constant[0]), &((*Dirent)->FileName[0]), 4) &&
+                        RtlEqualMemory(&(Ccb->OemQueryTemplate.Constant[4]), &((*Dirent)->FileName[4]), 4) &&
+                        RtlEqualMemory(&(Ccb->OemQueryTemplate.Constant[8]), &((*Dirent)->FileName[8]), 2) &&
+                        RtlEqualMemory(&(Ccb->OemQueryTemplate.Constant[10]), &((*Dirent)->FileName[10]), 1)) {
 
                         DebugTrace( 0, Dbg, "Entry found.\n", 0);
 
