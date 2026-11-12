@@ -1,7 +1,11 @@
 # Build artifacts
 obj_le/
+obj/
+obj_test/
 *.o
 *.elf
 *.dol
 wii_sd/
-
+ntoskrnl.bin
+ntoskrnl.elf
+ntoskrnl_le.elf
