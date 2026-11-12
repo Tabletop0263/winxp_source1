@@ -7,6 +7,9 @@ on:
     branches: [master]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -24,6 +27,12 @@ jobs:
           path: entii
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Install build dependencies
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y make wget curl xz-utils gcc
+
       - name: Install devkitPPC r35 (powerpc-eabi toolchain)
         run: |
           set -euxo pipefail
@@ -35,7 +44,7 @@ jobs:
           sudo tar -xJf devkitppc.tar.xz -C /opt/devkitpro
           echo "DEVKITPPC=/opt/devkitpro/devkitPPC" >> $GITHUB_ENV
           echo "=== devkitPPC installed ==="
-          ls /opt/devkitpro/devkitPPC/bin/powerpc-eabi-gcc
+          ls -la /opt/devkitpro/devkitPPC/bin/powerpc-eabi-gcc
 
       - name: Install devkitppc-rules (wii_rules, base_rules, base_tools)
         run: |
@@ -48,7 +57,7 @@ jobs:
           sudo cp /tmp/devkitppc-rules-master/base_rules /opt/devkitpro/devkitPPC/base_rules
           sudo cp /tmp/devkitppc-rules-master/base_tools /opt/devkitpro/devkitPPC/base_tools
           echo "=== Rules installed ==="
-          ls /opt/devkitpro/devkitPPC/wii_rules
+          ls -la /opt/devkitpro/devkitPPC/wii_rules
 
       - name: Install elf2dol tool
         run: |
@@ -61,7 +70,7 @@ jobs:
           sudo cp /tmp/elf2dol /usr/local/bin/elf2dol
           echo "=== elf2dol installed ==="
           which elf2dol
-          elf2dol 2>&1 | head -1
+          elf2dol 2>&1 | head -1 || true
 
       - name: Install libogc (headers + libs for Wii)
         run: |
@@ -74,7 +83,7 @@ jobs:
           echo "LIBOGC_INC=/opt/devkitpro/libogc/include" >> $GITHUB_ENV
           echo "LIBOGC_LIB=/opt/devkitpro/libogc/lib/wii" >> $GITHUB_ENV
           echo "=== libogc installed ==="
-          ls /opt/devkitpro/libogc/lib/wii/libogc.a
+          ls -la /opt/devkitpro/libogc/lib/wii/libogc.a
 
       - name: Install libfat source (for fat.h header)
         run: |
@@ -99,12 +108,6 @@ jobs:
           echo '#define _SHIFTR(v,s,w) (((v) >> (s)) & ((1 << (w)) - 1))' | sudo tee -a /opt/devkitpro/libogc/include/gccore.h > /dev/null
           echo "=== libfat stub done ==="
           /opt/devkitpro/devkitPPC/bin/powerpc-eabi-nm /opt/devkitpro/libogc/lib/wii/libfat.a | grep fatMount
-
-      - name: Install build dependencies
-        run: |
-          set -euxo pipefail
-          sudo apt-get update
-          sudo apt-get install -y make wget curl xz-utils gcc
 
       - name: Build arcldr for Wii (DOL)
         working-directory: entii/arcldr
