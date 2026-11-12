@@ -91,7 +91,7 @@ jobs:
           export DEVKITPRO=/opt/devkitpro
           export PATH="$DEVKITPPC/bin:$PATH"
           # Patch _Static_assert for GCC 8.3 (single-arg needs C23)
-          sed -i 's/_Static_assert((sizeof(HW_DESCRIPTION) % sizeof(unsigned long long)) == 0);/_Static_assert((sizeof(HW_DESCRIPTION) % sizeof(unsigned long long)) == 0, "");/' inc/hwdesc.h
+          sed -i 's/_Static_assert((sizeof(HW_DESCRIPTION) % sizeof(unsigned long long)) == 0);/_Static_assert((sizeof(HW_DESCRIPTION) % sizeof(unsigned long long)) == 0, "");/' ../inc/hwdesc.h
           make -f Makefile.wii
           ls -la arcldr_rvl.dol arcldr_rvl.elf
 
