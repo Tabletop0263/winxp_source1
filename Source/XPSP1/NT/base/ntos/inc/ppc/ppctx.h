@@ -337,6 +337,16 @@ KeInitializeKernelPpc(
     );
 
 /*--------------------------------------------------------------------------
+    Framebuffer display driver (hals/halppc/ppc/display.c).
+--------------------------------------------------------------------------*/
+VOID HalpDisplayInit(IN PVOID LoaderBlock);
+VOID HalpClearScreen(VOID);
+VOID HalpPutChar(IN CHAR Ch);
+VOID HalpPutString(IN const CHAR *Str);
+VOID HalpSetColors(IN ULONG FgColor, IN ULONG BgColor);
+VOID HalpDisplayPrintf(IN const CHAR *Fmt, ...);
+
+/*--------------------------------------------------------------------------
     Inline SPR/MSR accessors (shared between HAL and kernel).
 --------------------------------------------------------------------------*/
 

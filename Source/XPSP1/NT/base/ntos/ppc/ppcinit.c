@@ -103,6 +103,14 @@ KeInitializeKernelPpc(
     /* Record the PPC machine type from the PVR. */
     KiInitializeMachineType();
 
+    /* Initialize the framebuffer display from the PHW_DESCRIPTION. */
+    HalpDisplayInit(LoaderBlock);
+    HalpClearScreen();
+    HalpSetColors(0x00FFFFFFUL, 0x00000000UL);
+    HalpDisplayPrintf("Windows XP (NT 5.1) - PowerPC Broadway/G3 Port\r\n");
+    HalpDisplayPrintf("Kernel initialized. Boot phase complete.\r\n");
+    HalpDisplayPrintf("Entry: _start at 0x1B84\r\n");
+
     /* Decrementer/timebase initialization:
      * Program SPR_DEC from the loader-block-discovered clock rate so the
      * system tick fires at the correct interval, then enable external

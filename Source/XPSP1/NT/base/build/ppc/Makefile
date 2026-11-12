@@ -24,7 +24,8 @@ INC_NTDLL := $(ARCH_ROOT)/ntdll/ppc
 
 CFLAGS  := -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding \
            -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
-           -I$(INC_PPC) -I$(INC_NTOS) -I$(INC_NTDLL)
+           -I$(INC_PPC) -I$(INC_NTOS) -I$(INC_NTDLL) \
+           -I$(HAL)
 ASFLAGS :=
 LDFLAGS := -Ttext 0x00000000 -nostdlib -static
 
@@ -35,7 +36,7 @@ ELF    := ntoskrnl.elf
 
 HAL_OBJS := $(OBJDIR)/hal_halppc.o $(OBJDIR)/hal_atomic.o \
             $(OBJDIR)/hal_interrupt.o $(OBJDIR)/hal_context.o \
-            $(OBJDIR)/hal_of.o
+            $(OBJDIR)/hal_of.o $(OBJDIR)/hal_display.o $(OBJDIR)/hal_font.o
 
 NTDLL_OBJS := $(OBJDIR)/ntdll_context.o $(OBJDIR)/ntdll_dispatch.o \
               $(OBJDIR)/ntdll_critsect.o $(OBJDIR)/ntdll_ldrctx.o \
@@ -68,6 +69,12 @@ $(OBJDIR)/hal_context.o: $(HAL)/context.S | $(OBJDIR)
 	$(AS) $(ASFLAGS) $< -o $@
 
 $(OBJDIR)/hal_of.o: $(HAL)/of.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR)/hal_display.o: $(HAL)/display.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR)/hal_font.o: $(HAL)/font8x8.c | $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OBJDIR)/ntdll_context.o: $(NTDLL)/context.c | $(OBJDIR)
