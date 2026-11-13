@@ -259,8 +259,13 @@ HalpSetColors(
     framebuffer so a human can tell the kernel is running even when there
     is no other visible output.
 
-    Drawn every Decrementer tick (100 Hz).  The block toggles on/off once
-    per second (~100 ticks) by counting ticks internally.
+    Two modes:
+      * HalpDisplayTickBlink()   - single toggle, called once per Decrementer
+                                   tick when interrupts work (vector 0x900).
+      * HalpBlinkBootIndicator() - busy-wait infinite loop that flashes the
+                                   block repeatedly with NO interrupts needed.
+                                   Use this as a "kernel alive" heartbeat at
+                                   end of boot when interrupts may not fire.
 --------------------------------------------------------------------------*/
 static volatile ULONG HalpBlinkTickCount = 0;
 static volatile BOOLEAN HalpBlinkVisible = FALSE;
@@ -288,14 +293,16 @@ HalpDrawBlinkBlock(
     }
 }
 
-/* Called once per Decrementer tick (100 Hz). Toggles the blink block
- * once per second (~100 ticks). Callers must not call from interrupt
- * context without IRQL considerations; this port runs single-core and
- * the Decrementer ISR calls this directly. */
+/*--------------------------------------------------------------------------
+    HalpDisplayTickBlink - single blink toggle per call.
+
+    Called once per Decrementer tick (100 Hz). Toggles the blink block
+    once per second (~100 ticks). No busy-wait; safe to call from ISR.
+--------------------------------------------------------------------------*/
 VOID
 HalpDisplayTickBlink(VOID)
 {
-    /* Draw previous state erased (XOR with background), then toggle. */
+    /* Erase previous state, then toggle. */
     HalpDrawBlinkBlock(8, 8, 24, HalpBlinkVisible);
 
     HalpBlinkTickCount++;
@@ -306,6 +313,62 @@ HalpDisplayTickBlink(VOID)
 
     /* Draw new state. */
     HalpDrawBlinkBlock(8, 8, 24, HalpBlinkVisible);
+}
+
+/*--------------------------------------------------------------------------
+    HalpDiskActivityBlink - flash the disk activity block once.
+
+    Called from SD read/write paths so a second block (near the kernel-alive
+    block) flashes whenever the SD card is accessed. Use a distinct position
+    so kernel-alive vs disk activity are distinguishable.
+--------------------------------------------------------------------------*/
+VOID
+HalpDiskActivityBlink(VOID)
+{
+    /* Flash a small block at (40, 8) to indicate SD/disk activity. */
+    HalpDrawBlinkBlock(40, 8, 16, TRUE);
+    HalpStallExecution(200000);   /* ~200 ms on */
+    HalpDrawBlinkBlock(40, 8, 16, FALSE);
+    HalpStallExecution(200000);   /* ~200 ms off */
+}
+
+/*--------------------------------------------------------------------------
+    HalpBlinkBootIndicator - busy-wait "kernel alive" heartbeat.
+
+    Flashes the kernel-alive block at (8,8) ~once per second using a
+    busy-wait stall. NO interrupts required. Loops forever; call this as
+    the final step of boot when you want a guaranteed visual heartbeat
+    on real hardware.
+
+    Also flashes the disk-activity block at (40,8) whenever the SD card
+    has been accessed since the last blink cycle (tracked by
+    HalpDiskActivityPending).
+--------------------------------------------------------------------------*/
+volatile BOOLEAN HalpDiskActivityPending = FALSE;
+
+VOID
+HalpBlinkBootIndicator(VOID)
+{
+    volatile ULONG i;
+    ULONG cycle;
+
+    for (cycle = 0; ; cycle++) {
+        /* Kernel-alive block: on for ~500 ms, off for ~500 ms. */
+        HalpDrawBlinkBlock(8, 8, 24, TRUE);
+        for (i = 0; i < 5000000UL; i++) { __asm__ __volatile__ ("nop"); }
+
+        HalpDrawBlinkBlock(8, 8, 24, FALSE);
+
+        /* Disk-activity block: flash if SD was accessed this cycle. */
+        if (HalpDiskActivityPending) {
+            HalpDiskActivityPending = FALSE;
+            HalpDrawBlinkBlock(40, 8, 16, TRUE);
+            for (i = 0; i < 1000000UL; i++) { __asm__ __volatile__ ("nop"); }
+            HalpDrawBlinkBlock(40, 8, 16, FALSE);
+        }
+
+        for (i = 0; i < 5000000UL; i++) { __asm__ __volatile__ ("nop"); }
+    }
 }
 
 /*--------------------------------------------------------------------------

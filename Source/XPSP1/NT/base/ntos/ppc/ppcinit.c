@@ -68,6 +68,9 @@ VOID HalpInstallVectors(VOID (*Entry)(ULONG));
 /* Decrementer/timebase setup (hals/halppc/ppc/interrupt.c) */
 VOID HalpInitializeDecrementer(IN ULONG DecrementerFrequency);
 
+/* Blink indicator (hals/halppc/ppc/display.c). */
+VOID HalpBlinkBootIndicator(VOID);
+
 /* OpenFirmware clock discovery (hals/halppc/ppc/of.c) */
 ULONG HalpGetClockFrequency(VOID);
 
@@ -226,6 +229,13 @@ KeInitializeKernelPpc(
             );
         if (!NT_SUCCESS(shellStatus)) {
             HalpDisplayPrintf("Failed to start shell: 0x%08X\r\n", shellStatus);
+
+            /* No scheduler and shell failed to start; fall back to a
+             * busy-wait "kernel alive" heartbeat that needs NO interrupts.
+             * This keeps the blink block flashing on real hardware so a
+             * human can tell the kernel is running even when the
+             * Decrementer interrupt is silent. */
+            HalpBlinkBootIndicator();
         }
     }
 

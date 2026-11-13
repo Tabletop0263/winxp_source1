@@ -352,11 +352,24 @@ VOID HalpDisplayPrintf(IN const CHAR *Fmt, ...);
 /*--------------------------------------------------------------------------
     Blink indicator (hals/halppc/ppc/display.c).
 
-    Called once per Decrementer tick to draw a flashing block at the
-    top-left corner of the framebuffer, so a human can tell the kernel
-    is running even when there is no other visible output.
+    HalpDisplayTickBlink()   - single toggle per call (for Decrementer ISR).
+    HalpDiskActivityBlink()  - flash disk-activity block once.
+    HalpBlinkBootIndicator() - busy-wait "kernel alive" heartbeat loop
+                               (NO interrupts required; loops forever).
+    HalpDiskActivityPending  - flag set by SD/disk paths to flash activity.
 --------------------------------------------------------------------------*/
 VOID HalpDisplayTickBlink(VOID);
+VOID HalpDiskActivityBlink(VOID);
+VOID HalpBlinkBootIndicator(VOID);
+extern volatile BOOLEAN HalpDiskActivityPending;
+
+/*--------------------------------------------------------------------------
+    Processor stall (hals/halppc/ppc/halppc.c).
+
+    HalpStallExecution - busy-wait for a given number of microseconds.
+    Used by disk activity blink for short delays without interrupts.
+--------------------------------------------------------------------------*/
+VOID HalpStallExecution(IN ULONG Microseconds);
 
 /*--------------------------------------------------------------------------
     Controller input (hals/halppc/ppc/pad.c).

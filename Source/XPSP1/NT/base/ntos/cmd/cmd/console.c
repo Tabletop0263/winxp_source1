@@ -48,6 +48,15 @@ Environment:
 #include "ppctx.h"
 #include "wxptypes.h"
 
+/*--------------------------------------------------------------------------
+    Blink indicator - declared in ppctx.h (implemented in
+    hals/halppc/ppc/display.c).  HalpDisplayTickBlink() toggles the
+    kernel-alive block at (8,8) ~once per second.  Called each poll
+    iteration here so the block keeps flashing even if the Decrementer
+    interrupt never fires on real hardware.
+--------------------------------------------------------------------------*/
+VOID HalpDisplayTickBlink(VOID);
+
 #ifndef UNREFERENCED_PARAMETER
 #define UNREFERENCED_PARAMETER(P) (void)(P)
 #endif
@@ -100,6 +109,10 @@ ConsoleReadLine(
     /* Debounce state: track which buttons were pressed last poll so we
      * only generate one key event per press (not per poll while held). */
     for (;;) {
+        /* Flash the kernel-alive block each poll so a human can tell the
+         * kernel is running even if the Decrementer interrupt never fires. */
+        HalpDisplayTickBlink();
+
         HalpGetControllerState(&State);
 
         /* Buttons newly pressed since last poll. */

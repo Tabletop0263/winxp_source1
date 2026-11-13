@@ -48,6 +48,12 @@
 #include <string.h>
 
 /*--------------------------------------------------------------------------
+    Disk activity blink flag (set by SD read/write paths; consumed by
+    HalpBlinkBootIndicator() to flash the disk-activity block).
+--------------------------------------------------------------------------*/
+extern volatile BOOLEAN HalpDiskActivityPending;
+
+/*--------------------------------------------------------------------------
     Broadway EXI2 (SD card) register base addresses.
 --------------------------------------------------------------------------*/
 #define EXI2_BASE            ((volatile unsigned long *)0xCD006400UL)
@@ -251,6 +257,7 @@ HalpSdReadBlock(IN ULONG Sector, OUT PVOID Buffer)
     HalpExiRead();
     HalpExiRead();
 
+    HalpDiskActivityPending = TRUE;   /* signal disk activity for blink indicator */
     return TRUE;
 }
 
