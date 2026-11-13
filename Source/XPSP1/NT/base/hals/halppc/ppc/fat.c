@@ -883,3 +883,303 @@ HalpFatListDirectory(IN const CHAR *Path)
 
     return entriesListed;
 }
+
+/*--------------------------------------------------------------------------
+    FAT write support - minimal, just enough to write a debug log file.
+
+    These are write counterparts to the read-only FAT reader above.  Only
+    FAT32 is handled (Wii SD cards are almost always FAT32).
+--------------------------------------------------------------------------*/
+
+/*--------------------------------------------------------------------------
+    HalpFatWriteSector - write one sector to the SD card.
+--------------------------------------------------------------------------*/
+static BOOLEAN
+HalpFatWriteSector(IN ULONG Sector, IN PVOID Buffer)
+{
+    ULONG written = HalpSdWriteSectors(Sector, 1, Buffer);
+    return written == 1;
+}
+
+/*--------------------------------------------------------------------------
+    HalpFatFindFreeCluster - scan the FAT for a free (zero) cluster entry.
+
+    Returns the cluster number, or 0xFFFFFFFF if none found.
+--------------------------------------------------------------------------*/
+static ULONG
+HalpFatFindFreeCluster(VOID)
+{
+    PFAT_VOLUME vol = &HalpFatVolume;
+    UCHAR sectorBuf[FAT_SECTOR_SIZE];
+    ULONG entriesPerSector = vol->BytesPerSector / 4;
+    ULONG sector;
+
+    for (sector = vol->FirstFatSector;
+         sector < vol->FirstFatSector + vol->SectorsPerFat;
+         sector++) {
+        if (!HalpFatReadSector(sector, sectorBuf)) {
+            continue;
+        }
+        ULONG i;
+        for (i = 0; i < entriesPerSector; i++) {
+            ULONG entry = *(ULONG *)(sectorBuf + i * 4);
+            if (entry == 0) {
+                ULONG cluster = (sector - vol->FirstFatSector) * entriesPerSector + i;
+                if (cluster < 2) {
+                    continue;   /* clusters 0 and 1 are reserved */
+                }
+                return cluster;
+            }
+        }
+    }
+
+    return 0xFFFFFFFFUL;
+}
+
+/*--------------------------------------------------------------------------
+    HalpFatSetFatEntry - set a FAT32 FAT entry for a cluster.
+
+    Cluster: cluster number
+    Value:   next cluster in chain, or 0x0FFFFFFF for end-of-chain
+--------------------------------------------------------------------------*/
+static BOOLEAN
+HalpFatSetFatEntry(IN ULONG Cluster, IN ULONG Value)
+{
+    PFAT_VOLUME vol = &HalpFatVolume;
+    ULONG fatOffset = Cluster * 4;
+    ULONG fatSector = vol->FirstFatSector + (fatOffset / vol->BytesPerSector);
+    ULONG fatIndex = fatOffset % vol->BytesPerSector;
+    UCHAR sectorBuf[FAT_SECTOR_SIZE];
+
+    if (!HalpFatReadSector(fatSector, sectorBuf)) {
+        return FALSE;
+    }
+
+    *(ULONG *)(sectorBuf + fatIndex) = Value & 0x0FFFFFFFUL;
+
+    return HalpFatWriteSector(fatSector, sectorBuf);
+}
+
+/*--------------------------------------------------------------------------
+    HalpFatFindFreeDirEntry - find a free or deleted directory entry.
+
+    DirSector:      starting sector of the directory
+    SectorsToScan:  number of sectors to scan
+    OutSector:      output sector containing the free entry
+    OutIndex:       output entry index within that sector
+    Returns:        TRUE on success.
+--------------------------------------------------------------------------*/
+static BOOLEAN
+HalpFatFindFreeDirEntry(IN ULONG DirSector,
+                        IN ULONG SectorsToScan,
+                        OUT PULONG OutSector,
+                        OUT PULONG OutIndex)
+{
+    ULONG entriesPerSector = FAT_SECTOR_SIZE / sizeof(FAT_DIR_ENTRY);
+    ULONG s, i;
+    UCHAR sectorBuf[FAT_SECTOR_SIZE];
+
+    for (s = 0; s < SectorsToScan; s++) {
+        if (!HalpFatReadSector(DirSector + s, sectorBuf)) {
+            continue;
+        }
+        for (i = 0; i < entriesPerSector; i++) {
+            FAT_DIR_ENTRY *ent = (FAT_DIR_ENTRY *)(sectorBuf + i * sizeof(FAT_DIR_ENTRY));
+            if (ent->Name[0] == FAT_DIR_FREE || ent->Name[0] == FAT_DIR_DELETED) {
+                *OutSector = DirSector + s;
+                *OutIndex = i;
+                return TRUE;
+            }
+        }
+    }
+
+    return FALSE;
+}
+
+/*--------------------------------------------------------------------------
+    HalpFatGetDirSector - return the sector of a directory given its cluster.
+
+    For FAT32 the directory's cluster maps to a sector via ClusterToSector.
+    For FAT12/16 the cluster value is itself the root-dir sector.
+--------------------------------------------------------------------------*/
+static ULONG
+HalpFatGetDirSector(IN ULONG ClusterOrSector)
+{
+    PFAT_VOLUME vol = &HalpFatVolume;
+    if (vol->IsFat32) {
+        return HalpFatClusterToSector(ClusterOrSector);
+    }
+    return ClusterOrSector;
+}
+
+/*--------------------------------------------------------------------------
+    HalpFatWriteFile - create (or overwrite) a file and write data to it.
+
+    Path:      null-terminated path (e.g. "\\nt\\debug.log")
+    Data:      source data buffer
+    DataSize:  number of bytes to write
+    Returns:   TRUE on success.
+--------------------------------------------------------------------------*/
+BOOLEAN
+HalpFatWriteFile(IN const CHAR *Path, IN PVOID Data, IN ULONG DataSize)
+{
+    PFAT_VOLUME vol = &HalpFatVolume;
+    CHAR comps[FAT_MAX_PATH / 12][12];
+    ULONG nComps;
+    ULONG start;
+    ULONG dirCluster;
+    ULONG dirSector;
+    ULONG sectorsToScan;
+    ULONG i;
+
+    if (!vol->Mounted || DataSize == 0) {
+        return FALSE;
+    }
+
+    nComps = HalpFatParsePath(Path, comps, FAT_MAX_PATH / 12);
+    if (nComps == 0) {
+        return FALSE;
+    }
+
+    /* Determine starting directory. */
+    if (vol->IsFat32) {
+        start = vol->RootCluster;
+    } else {
+        start = vol->RootDirSector;
+    }
+
+    /* Navigate to the parent directory (all but the last component). */
+    if (nComps > 1) {
+        if (!HalpFatOpenDirectory(comps, nComps - 1, start, &dirCluster)) {
+            return FALSE;
+        }
+    } else {
+        dirCluster = start;
+    }
+
+    dirSector = HalpFatGetDirSector(dirCluster);
+    sectorsToScan = vol->IsFat32 ? vol->SectorsPerCluster : 1;
+
+    /* Look for an existing entry with the same name. */
+    CHAR name83[12];
+    HalpFatNameTo83(comps[nComps - 1], name83);
+
+    ULONG fileSector = 0xFFFFFFFFUL;
+    ULONG fileIndex = 0xFFFFFFFFUL;
+    FAT_DIR_ENTRY existingEntry;
+    BOOLEAN foundExisting = FALSE;
+
+    for (i = 0; i < sectorsToScan; i++) {
+        FAT_DIR_ENTRY entry;
+        ULONG idx = HalpFatFindFileInSector(dirSector + i, name83, &entry);
+        if (idx != 0xFFFFFFFFUL) {
+            foundExisting = TRUE;
+            fileSector = dirSector + i;
+            fileIndex = idx;
+            existingEntry = entry;
+            break;
+        }
+    }
+
+    /* Determine the starting cluster for the file. */
+    ULONG startCluster;
+    if (foundExisting) {
+        startCluster = ((ULONG)existingEntry.FirstClusterHigh << 16) |
+                       existingEntry.FirstClusterLow;
+    } else {
+        /* Find a free directory entry to create the file. */
+        ULONG freeSector, freeIndex;
+        if (!HalpFatFindFreeDirEntry(dirSector, sectorsToScan, &freeSector, &freeIndex)) {
+            return FALSE;   /* no room in directory */
+        }
+        startCluster = HalpFatFindFreeCluster();
+        if (startCluster == 0xFFFFFFFFUL) {
+            return FALSE;   /* disk full */
+        }
+        fileSector = freeSector;
+        fileIndex = freeIndex;
+    }
+
+    /* Allocate a cluster chain large enough for the data. */
+    ULONG clusterSize = vol->ClusterSize;
+    ULONG clustersNeeded = (DataSize + clusterSize - 1) / clusterSize;
+    ULONG prevCluster = 0xFFFFFFFFUL;
+    ULONG curCluster = startCluster;
+
+    /* If we're overwriting an existing file, we reuse its first cluster
+     * and allocate additional clusters as needed. The FAT chain beyond the
+     * first cluster may be stale; we rebuild it here. */
+    for (i = 0; i < clustersNeeded; i++) {
+        if (i == 0) {
+            /* Reuse the existing start cluster (or the newly found one). */
+            curCluster = startCluster;
+        } else {
+            curCluster = HalpFatFindFreeCluster();
+            if (curCluster == 0xFFFFFFFFUL) {
+                return FALSE;   /* disk mid-write */
+            }
+        }
+
+        if (prevCluster != 0xFFFFFFFFUL) {
+            if (!HalpFatSetFatEntry(prevCluster, curCluster)) {
+                return FALSE;
+            }
+        }
+        prevCluster = curCluster;
+
+        /* Write this cluster's worth of data. */
+        ULONG byteOffset = i * clusterSize;
+        ULONG toWrite = DataSize - byteOffset;
+        if (toWrite > clusterSize) {
+            toWrite = clusterSize;
+        }
+
+        UCHAR clusterBuf[FAT_SECTOR_SIZE * 16];  /* max 16 sectors per cluster */
+        if (clusterSize > sizeof(clusterBuf)) {
+            return FALSE;
+        }
+        memset(clusterBuf, 0, clusterSize);
+        if (toWrite > 0) {
+            memcpy(clusterBuf, (UCHAR *)Data + byteOffset, toWrite);
+        }
+
+        ULONG clusterStartSector = HalpFatClusterToSector(curCluster);
+        ULONG secPerCluster = clusterSize / vol->BytesPerSector;
+        ULONG s;
+        for (s = 0; s < secPerCluster; s++) {
+            if (!HalpFatWriteSector(clusterStartSector + s,
+                                    clusterBuf + s * vol->BytesPerSector)) {
+                return FALSE;
+            }
+        }
+    }
+
+    /* Terminate the chain. */
+    if (!HalpFatSetFatEntry(prevCluster, 0x0FFFFFFFUL)) {
+        return FALSE;
+    }
+
+    /* Build / update the directory entry. */
+    FAT_DIR_ENTRY ent;
+    memset(&ent, 0, sizeof(ent));
+    memcpy(ent.Name, name83, 11);
+    ent.Attributes = FAT_ATTR_ARCHIVE;
+    ent.Time = 0;
+    ent.Date = 0;
+    ent.FirstClusterHigh = (USHORT)(startCluster >> 16);
+    ent.FirstClusterLow = (USHORT)(startCluster & 0xFFFFUL);
+    ent.FileSize = DataSize;
+
+    /* Write the directory entry back to its sector. */
+    UCHAR dirSectorBuf[FAT_SECTOR_SIZE];
+    if (!HalpFatReadSector(fileSector, dirSectorBuf)) {
+        return FALSE;
+    }
+    FAT_DIR_ENTRY *destEnt = (FAT_DIR_ENTRY *)(dirSectorBuf + fileIndex * sizeof(FAT_DIR_ENTRY));
+    *destEnt = ent;
+    if (!HalpFatWriteSector(fileSector, dirSectorBuf)) {
+        return FALSE;
+    }
+
+    return TRUE;
+}

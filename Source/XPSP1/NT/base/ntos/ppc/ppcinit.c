@@ -133,42 +133,42 @@ KeInitializeKernelPpc(
     HalpDisplayInit(LoaderBlock);
     HalpClearScreen();
     HalpSetColors(0x00FFFFFFUL, 0x00000000UL);
-    HalpDisplayPrintf("Windows XP (NT 5.1) - PowerPC Broadway/G3 Port\r\n");
-    HalpDisplayPrintf("Kernel initialized. Boot phase complete.\r\n");
-    HalpDisplayPrintf("Entry: _start at 0x1B84\r\n");
+    HalpDebugPrintf("Windows XP (NT 5.1) - PowerPC Broadway/G3 Port\r\n");
+    HalpDebugPrintf("Kernel initialized. Boot phase complete.\r\n");
+    HalpDebugPrintf("Entry: _start at 0x1B84\r\n");
 
     /* Initialize the Wii/GameCube PAD (Serial Interface) controller. */
     HalpControllerInit();
-    HalpDisplayPrintf("Controller input initialized.\r\n");
+    HalpDebugPrintf("Controller input initialized.\r\n");
 
     /* Initialize the SD card block device and mount the FAT volume. */
     {
-        HalpDisplayPrintf("Initializing SD card...\r\n");
+        HalpDebugPrintf("Initializing SD card...\r\n");
         if (HalpSdInit()) {
             ULONG sectors = HalpSdGetSectorCount();
             ULONG sectorSize = HalpSdGetSectorSize();
-            HalpDisplayPrintf("SD card initialized: %lu sectors x %lu bytes\r\n",
+            HalpDebugPrintf("SD card initialized: %lu sectors x %lu bytes\r\n",
                               sectors, sectorSize);
 
             if (HalpFatInit()) {
-                HalpDisplayPrintf("FAT volume mounted.\r\n");
+                HalpDebugPrintf("FAT volume mounted.\r\n");
 
                 /* Probe for a test file on the SD card. */
                 {
                     ULONG fileSize = 0;
                     ULONG startCluster = 0;
                     if (HalpFatOpen("\\nt\\arcfw.elf", &fileSize, &startCluster)) {
-                        HalpDisplayPrintf("Found \\nt\\arcfw.elf (%lu bytes, cluster %lu)\r\n",
+                        HalpDebugPrintf("Found \\nt\\arcfw.elf (%lu bytes, cluster %lu)\r\n",
                                           fileSize, startCluster);
                     } else {
-                        HalpDisplayPrintf("\\nt\\arcfw.elf not found on SD card.\r\n");
+                        HalpDebugPrintf("\\nt\\arcfw.elf not found on SD card.\r\n");
                     }
                 }
             } else {
-                HalpDisplayPrintf("FAT volume mount failed.\r\n");
+                HalpDebugPrintf("FAT volume mount failed.\r\n");
             }
         } else {
-            HalpDisplayPrintf("SD card init failed.\r\n");
+            HalpDebugPrintf("SD card init failed.\r\n");
         }
     }
 
@@ -176,27 +176,12 @@ KeInitializeKernelPpc(
     {
         NTSTATUS cmStatus = CmInitializeConfigRegistry(LoaderBlock);
         if (!NT_SUCCESS(cmStatus)) {
-            HalpDisplayPrintf("Config registry init failed: 0x%08X\r\n", cmStatus);
+            HalpDebugPrintf("Config registry init failed: 0x%08X\r\n", cmStatus);
         }
     }
 
-    /* Decrementer/timebase initialization:
-     * Program SPR_DEC from the loader-block-discovered clock rate so the
-     * system tick fires at the correct interval, then enable external
-     * interrupts (MSR.EE) so the Decrementer interrupt (vector 0x900)
-     * fires.
-     *
-     * If no loader block or zero frequency is provided, fall back to
-     * HalpGetClockFrequency() (OF / compile-time default).
-     */
+    /* Decrementer/timebase initialization: ... */
     if (KeLoaderBlock != NULL) {
-        /* PHW_DESCRIPTION layout:
-         *   offset 0  MemoryLength[0]
-         *   offset 4  MemoryLength[1]
-         *   offset 8  DdrIpcBase
-         *   offset 12 DdrIpcLength
-         *   offset 16 DecrementerFrequency  <-- bus clock / 4, used for SPR_DEC
-         */
         ULONG dec_freq = *(ULONG *)((ULONG_PTR)KeLoaderBlock + 16);
         if (dec_freq != 0) {
             HalpInitializeDecrementer(dec_freq);
@@ -212,10 +197,14 @@ KeInitializeKernelPpc(
      * Wii hardware. */
     HalConnectInterrupt(0x900, HalpDecrementerHandler);
 
+    /* Flush the captured debug log to sd:/nt/debug.log so the user can
+     * diagnose even if the framebuffer is black. */
+    if (!HalpDebugFlushToSd()) {
+        HalpDebugPrintf("Debug log flush to SD failed.\r\n");
+    }
+
     /* Start the Windows shell (cmd.exe analog) as the initial system
-     * thread.  PsCreateSystemThread runs the start routine immediately on
-     * this processor (this port has no scheduler yet), so CmdMain will
-     * own the CPU and run the REPL. */
+     * thread. */
     {
         HANDLE ShellThread;
         NTSTATUS shellStatus = PsCreateSystemThread(

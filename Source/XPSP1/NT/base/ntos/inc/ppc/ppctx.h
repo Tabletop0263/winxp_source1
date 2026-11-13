@@ -350,6 +350,16 @@ VOID HalpSetColors(IN ULONG FgColor, IN ULONG BgColor);
 VOID HalpDisplayPrintf(IN const CHAR *Fmt, ...);
 
 /*--------------------------------------------------------------------------
+    Debug-to-SD log facility (hals/halppc/ppc/display.c).
+
+    HalpDebugPrintf   - printf to both framebuffer and an in-memory log.
+    HalpDebugFlushToSd- flush the captured log to sd:/nt/debug.log
+                        so diagnostics survive even with a black screen.
+--------------------------------------------------------------------------*/
+VOID HalpDebugPrintf(IN const CHAR *Fmt, ...);
+BOOLEAN HalpDebugFlushToSd(VOID);
+
+/*--------------------------------------------------------------------------
     Blink indicator (hals/halppc/ppc/display.c).
 
     HalpDisplayTickBlink()   - single toggle per call (for Decrementer ISR).
@@ -415,6 +425,7 @@ ULONG   HalpFatReadClusters(IN ULONG StartCluster, IN ULONG ByteOffset,
                             IN ULONG ByteCount, OUT PVOID Buffer);
 VOID    HalpFatClose(VOID);
 ULONG   HalpFatListDirectory(IN const CHAR *Path);
+BOOLEAN HalpFatWriteFile(IN const CHAR *Path, IN PVOID Data, IN ULONG DataSize);
 
 /*--------------------------------------------------------------------------
     Inline SPR/MSR accessors (shared between HAL and kernel).

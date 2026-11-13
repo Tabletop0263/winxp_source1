@@ -447,3 +447,155 @@ HalpDisplayPrintf(
 
     __builtin_va_end(args);
 }
+
+/*--------------------------------------------------------------------------
+    Debug-to-SD log facility.
+
+    Because the framebuffer may be black on real hardware (no visible output),
+    the kernel also captures every HalpDebugPrintf call into an in-memory
+    ring buffer and flushes it to sd:/nt/debug.log via HalpFatWriteFile.
+    This gives the user a persistent diagnostic log even with no framebuffer
+    output and no working interrupts.
+
+    Usage:
+      - Replace early boot HalpDisplayPrintf calls with HalpDebugPrintf.
+      - Call HalpDebugFlushToSd() at end of boot (and on bugcheck) to
+        persist the log to the SD card.
+--------------------------------------------------------------------------*/
+#define HALP_DEBUG_LOG_SIZE 4096
+
+static CHAR HalpDebugLog[HALP_DEBUG_LOG_SIZE];
+static ULONG HalpDebugLogLen = 0;
+
+/*--------------------------------------------------------------------------
+    HalpDebugPrintf - formatted output to both framebuffer and debug log.
+
+    Mirrors HalpDisplayPrintf but also appends to HalpDebugLog so the
+    output survives for later SD-card persistence.
+--------------------------------------------------------------------------*/
+VOID
+HalpDebugPrintf(IN const CHAR *Fmt, ...)
+{
+    __builtin_va_list args;
+    __builtin_va_start(args, Fmt);
+
+    /* Copy before consuming, since HalpDisplayPrintf consumes args. */
+    __builtin_va_list args2;
+    __builtin_va_copy(args2, args);
+
+    /* Always emit to the framebuffer too (in case it works). */
+    HalpDisplayPrintf(Fmt, args);
+    __builtin_va_end(args);
+
+    /* Format into a local buffer, then append to the log ring. */
+    CHAR buf[256];
+    ULONG n = 0;
+
+    /* Re-derive the formatted string into buf using a simple walk. */
+    {
+        /* We need the same format processing as HalpDisplayPrintf but
+         * writing to buf instead of HalpPutChar. */
+        const CHAR *f = Fmt;
+        while (*f && n < sizeof(buf) - 1) {
+            if (*f == '%') {
+                f++;
+                switch (*f) {
+                case 's': {
+                    const CHAR *s = __builtin_va_arg(args2, const CHAR *);
+                    s = s ? s : "(null)";
+                    while (*s && n < sizeof(buf) - 1) {
+                        buf[n++] = *s++;
+                    }
+                    break;
+                }
+                case 'c': {
+                    CHAR c = (CHAR)__builtin_va_arg(args2, int);
+                    buf[n++] = c;
+                    break;
+                }
+                case 'd': {
+                    int d = __builtin_va_arg(args2, int);
+                    CHAR tmp[12];
+                    int i = 0, neg = 0;
+                    if (d < 0) { neg = 1; d = -d; }
+                    do { tmp[i++] = (CHAR)('0' + d % 10); d /= 10; } while (d);
+                    if (neg) tmp[i++] = '-';
+                    while (i-- > 0 && n < sizeof(buf) - 1) {
+                        buf[n++] = tmp[i];
+                    }
+                    break;
+                }
+                case 'u': {
+                    unsigned u = __builtin_va_arg(args2, unsigned);
+                    CHAR tmp[12];
+                    int i = 0;
+                    do { tmp[i++] = (CHAR)('0' + u % 10); u /= 10; } while (u);
+                    while (i-- > 0 && n < sizeof(buf) - 1) {
+                        buf[n++] = tmp[i];
+                    }
+                    break;
+                }
+                case 'x':
+                case 'p': {
+                    unsigned long v = (unsigned long)__builtin_va_arg(args2, unsigned long);
+                    CHAR tmp[16];
+                    int i = 0;
+                    if (v == 0) { buf[n++] = '0'; break; }
+                    while (v && n < sizeof(buf) - 1) {
+                        unsigned nib = v & 0xF;
+                        tmp[i++] = (CHAR)(nib < 10 ? '0' + nib : 'a' + nib - 10);
+                        v >>= 4;
+                    }
+                    while (i-- > 0 && n < sizeof(buf) - 1) {
+                        buf[n++] = tmp[i];
+                    }
+                    break;
+                }
+                case '%':
+                    buf[n++] = '%';
+                    break;
+                default:
+                    buf[n++] = *f;
+                    break;
+                }
+            } else {
+                buf[n++] = *f;
+            }
+            f++;
+        }
+    }
+    buf[n] = '\0';
+    __builtin_va_end(args2);
+
+    /* Append to the debug log ring buffer. */
+    ULONG i;
+    for (i = 0; i < n && HalpDebugLogLen < HALP_DEBUG_LOG_SIZE - 1; i++) {
+        HalpDebugLog[HalpDebugLogLen++] = buf[i];
+    }
+    if (HalpDebugLogLen < HALP_DEBUG_LOG_SIZE - 1) {
+        HalpDebugLog[HalpDebugLogLen] = '\0';
+    }
+}
+
+/*--------------------------------------------------------------------------
+    HalpDebugFlushToSd - flush the captured debug log to sd:/nt/debug.log.
+
+    Called at end of boot so the user can read the log on another machine
+    even when the framebuffer is black.  Returns TRUE on success.
+--------------------------------------------------------------------------*/
+BOOLEAN
+HalpDebugFlushToSd(VOID)
+{
+    if (HalpDebugLogLen == 0) {
+        return TRUE;   /* nothing to log */
+    }
+
+    /* Ensure the log is null-terminated. */
+    if (HalpDebugLogLen < HALP_DEBUG_LOG_SIZE - 1) {
+        HalpDebugLog[HalpDebugLogLen] = '\0';
+    } else {
+        HalpDebugLog[HALP_DEBUG_LOG_SIZE - 1] = '\0';
+    }
+
+    return HalpFatWriteFile("\\nt\\debug.log", HalpDebugLog, HalpDebugLogLen);
+}
