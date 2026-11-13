@@ -21,10 +21,11 @@ NTOS      := $(ARCH_ROOT)/ntos/ppc
 INC_PPC   := $(ARCH_ROOT)/ntos/inc/ppc
 INC_NTOS  := $(ARCH_ROOT)/ntos/inc
 INC_NTDLL := $(ARCH_ROOT)/ntdll/ppc
+INC_CONFIG:= $(ARCH_ROOT)/ntos/config
 
 CFLAGS  := -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding \
            -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
-           -I$(INC_PPC) -I$(INC_NTOS) -I$(INC_NTDLL) \
+           -I$(INC_PPC) -I$(INC_NTOS) -I$(INC_NTDLL) -I$(INC_CONFIG) \
            -I$(HAL)
 ASFLAGS :=
 LDFLAGS := -Ttext 0x00000000 -nostdlib -static
@@ -47,10 +48,26 @@ NTOS_OBJS := $(OBJDIR)/ntos_ppcinit.o $(OBJDIR)/ntos_exceptn.o \
              $(OBJDIR)/ntos_pcr.o $(OBJDIR)/ntos_ppc.o \
              $(OBJDIR)/ntoskrnl.o
 
+# New port modules: process/thread, object, LPC, shell.
+NTOS_PS_OBJS := $(OBJDIR)/ntos_ps_pslist.o $(OBJDIR)/ntos_ps_pscreate.o \
+                $(OBJDIR)/ntos_ps_psexit.o
+
+NTOS_OB_OBJS := $(OBJDIR)/ntos_ob_obcreate.o $(OBJDIR)/ntos_ob_obname.o
+
+NTOS_LPC_OBJS := $(OBJDIR)/ntos_lpc_lpc.o $(OBJDIR)/ntos_lpc_lpcport.o
+
+NTOS_CMD_OBJS := $(OBJDIR)/ntos_cmd_cmdmain.o $(OBJDIR)/ntos_cmd_cmds.o \
+                 $(OBJDIR)/ntos_cmd_console.o
+
+CONFIG_OBJS := $(OBJDIR)/config_cmregistry.o $(OBJDIR)/config_cmkey.o \
+               $(OBJDIR)/config_cmvalue.o $(OBJDIR)/config_cmcallback.o
+
 # Kernel entry stub (hand-written asm, not a source file in the tree).
 NTOS_ENTRY := $(OBJDIR)/ntos_entry.o
 
-ALL_OBJS := $(HAL_OBJS) $(NTDLL_OBJS) $(NTOS_OBJS) $(NTOS_ENTRY)
+ALL_OBJS := $(HAL_OBJS) $(NTDLL_OBJS) $(NTOS_OBJS) $(CONFIG_OBJS) \
+            $(NTOS_PS_OBJS) $(NTOS_OB_OBJS) $(NTOS_LPC_OBJS) $(NTOS_CMD_OBJS) \
+            $(NTOS_ENTRY)
 
 .PHONY: all clean
 all: $(ELF)
@@ -112,6 +129,50 @@ $(OBJDIR)/ntos_ppc.o: $(NTOS)/ppc.S | $(OBJDIR)
 	$(AS) $(ASFLAGS) $< -o $@
 
 $(OBJDIR)/ntoskrnl.o: $(NTOS)/ntoskrnl.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR)/config_cmregistry.o: $(ARCH_ROOT)/ntos/config/cmregistry.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR)/config_cmkey.o: $(ARCH_ROOT)/ntos/config/cmkey.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR)/config_cmvalue.o: $(ARCH_ROOT)/ntos/config/cmvalue.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR)/config_cmcallback.o: $(ARCH_ROOT)/ntos/config/cmcallback.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# ---- New port module compile rules --------------------------------------
+
+$(OBJDIR)/ntos_ps_pslist.o: $(ARCH_ROOT)/ntos/ps/pslist.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR)/ntos_ps_pscreate.o: $(ARCH_ROOT)/ntos/ps/pscreate.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR)/ntos_ps_psexit.o: $(ARCH_ROOT)/ntos/ps/psexit.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR)/ntos_ob_obcreate.o: $(ARCH_ROOT)/ntos/ob/obcreate.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR)/ntos_ob_obname.o: $(ARCH_ROOT)/ntos/ob/obname.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR)/ntos_lpc_lpc.o: $(ARCH_ROOT)/ntos/lpc/lpc.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR)/ntos_lpc_lpcport.o: $(ARCH_ROOT)/ntos/lpc/lpcport.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR)/ntos_cmd_cmdmain.o: $(ARCH_ROOT)/ntos/cmd/cmd/cmdmain.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR)/ntos_cmd_cmds.o: $(ARCH_ROOT)/ntos/cmd/cmd/cmds.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR)/ntos_cmd_console.o: $(ARCH_ROOT)/ntos/cmd/cmd/console.c | $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(NTOS_ENTRY): ntos_entry.S | $(OBJDIR)

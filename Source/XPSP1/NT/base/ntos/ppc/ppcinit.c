@@ -28,6 +28,29 @@ Revision History:
 
 #include "ppctx.h"
 
+/* wxptypes.h - HANDLE, PHANDLE, POBJECT_ATTRIBUTES, PCLIENT_ID,
+ * PKSTART_ROUTINE, NT_SUCCESS (ppctx.h defines NTSTATUS/STATUS_SUCCESS). */
+#include "wxptypes.h"
+
+/* Config manager - in-memory registry boot init. */
+NTSTATUS CmInitializeConfigRegistry(IN PVOID LoaderBlock);
+
+/* PS - process/thread creation (ntos/ps/pscreate.c). */
+NTSTATUS
+PsCreateSystemThread(
+    OUT PHANDLE ThreadHandle,
+    IN  ULONG DesiredAccess,
+    IN  POBJECT_ATTRIBUTES ObjectAttributes OPTIONAL,
+    IN  HANDLE ProcessHandle OPTIONAL,
+    OUT PCLIENT_ID ClientId OPTIONAL,
+    IN  PKSTART_ROUTINE StartRoutine,
+    IN  PVOID StartContext
+    );
+
+/* Shell entry point (ntos/cmd/cmd/cmdmain.c). */
+VOID
+CmdMain(IN PVOID StartContext);
+
 /* Kernel exception dispatcher (ntos/ppc/exceptn.c). */
 VOID
 KiExceptionDispatch(IN PKTRAP_FRAME TrapFrame);
@@ -115,6 +138,14 @@ KeInitializeKernelPpc(
     HalpControllerInit();
     HalpDisplayPrintf("Controller input initialized.\r\n");
 
+    /* Initialize the config registry (HKLM\HARDWARE, SYSTEM, SOFTWARE). */
+    {
+        NTSTATUS cmStatus = CmInitializeConfigRegistry(LoaderBlock);
+        if (!NT_SUCCESS(cmStatus)) {
+            HalpDisplayPrintf("Config registry init failed: 0x%08X\r\n", cmStatus);
+        }
+    }
+
     /* Decrementer/timebase initialization:
      * Program SPR_DEC from the loader-block-discovered clock rate so the
      * system tick fires at the correct interval, then enable external
@@ -140,6 +171,26 @@ KeInitializeKernelPpc(
         }
     } else {
         HalpInitializeDecrementer(HalpGetClockFrequency());
+    }
+
+    /* Start the Windows shell (cmd.exe analog) as the initial system
+     * thread.  PsCreateSystemThread runs the start routine immediately on
+     * this processor (this port has no scheduler yet), so CmdMain will
+     * own the CPU and run the REPL. */
+    {
+        HANDLE ShellThread;
+        NTSTATUS shellStatus = PsCreateSystemThread(
+            &ShellThread,
+            0,                          /* DesiredAccess */
+            NULL,                       /* ObjectAttributes */
+            NULL,                       /* ProcessHandle (system process) */
+            NULL,                       /* ClientId */
+            CmdMain,                    /* StartRoutine */
+            NULL                        /* StartContext */
+            );
+        if (!NT_SUCCESS(shellStatus)) {
+            HalpDisplayPrintf("Failed to start shell: 0x%08X\r\n", shellStatus);
+        }
     }
 
     return STATUS_SUCCESS;
