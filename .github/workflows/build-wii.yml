@@ -243,7 +243,7 @@ jobs:
             obj_le/ppcinit.o obj_le/exceptn.o obj_le/pcr.o obj_le/ntos_ppc.o obj_le/ntoskrnl.o obj_le/ntos_entry.o
 
           powerpc64le-linux-gnu-readelf -h ntoskrnl_le.elf | grep -E "Class|Data|Machine|Type|Entry"
-          powerpc64le-linux-gnu-nm ntoskrnl_le.elf | grep " U " | wc -l | xargs echo "undefined symbols:"
+          powerpc64le-linux-gnu-nm ntoskrnl_le.elf | grep -c " U " | xargs echo "undefined symbols:"
 
       - name: Package Wii SD card layout
         run: |
