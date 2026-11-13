@@ -104,6 +104,7 @@ typedef long           KPRIORITY;
 typedef long           LONG_PTR;
 typedef ULONG_PTR      SPFN_NUMBER;
 typedef ULONG_PTR      PFN_NUMBER;
+typedef unsigned long *PULONG;
 
 #ifndef NULL
 #define NULL ((void *)0)
@@ -355,6 +356,30 @@ typedef struct _CONTROLLER_STATE CONTROLLER_STATE, *PCONTROLLER_STATE;
 VOID HalpControllerInit(VOID);
 VOID HalpGetControllerState(OUT PCONTROLLER_STATE State);
 ULONG HalpControllerMapButton(IN ULONG PadButtons);
+
+/*--------------------------------------------------------------------------
+    SD card block device (hals/halppc/ppc/disk.c).
+--------------------------------------------------------------------------*/
+BOOLEAN HalpSdInit(VOID);
+BOOLEAN HalpSdIsInitialized(VOID);
+ULONG   HalpSdReadSectors(IN ULONG Sector, IN ULONG SectorCount, OUT PVOID Buffer);
+ULONG   HalpSdWriteSectors(IN ULONG Sector, IN ULONG SectorCount, IN const VOID *Buffer);
+ULONG   HalpSdGetSectorCount(VOID);
+ULONG   HalpSdGetSectorSize(VOID);
+
+/*--------------------------------------------------------------------------
+    FAT filesystem (hals/halppc/ppc/fat.c).
+--------------------------------------------------------------------------*/
+BOOLEAN HalpFatInit(VOID);
+BOOLEAN HalpFatIsMounted(VOID);
+ULONG   HalpFatGetSectorSize(VOID);
+BOOLEAN HalpFatOpen(IN const CHAR *Path, OUT PULONG FileSize, OUT PULONG StartCluster);
+ULONG   HalpFatRead(IN ULONG StartCluster, IN ULONG FileSize,
+                    IN ULONG ByteOffset, IN ULONG ByteCount, OUT PVOID Buffer);
+ULONG   HalpFatReadClusters(IN ULONG StartCluster, IN ULONG ByteOffset,
+                            IN ULONG ByteCount, OUT PVOID Buffer);
+VOID    HalpFatClose(VOID);
+ULONG   HalpFatListDirectory(IN const CHAR *Path);
 
 /*--------------------------------------------------------------------------
     Inline SPR/MSR accessors (shared between HAL and kernel).

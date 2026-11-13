@@ -176,7 +176,7 @@ jobs:
           done
 
           # Compile HAL C files
-          for f in halppc atomic interrupt context of display font8x8 pad; do
+          for f in halppc atomic interrupt context of display font8x8 pad disk fat; do
             powerpc64le-linux-gnu-gcc -m32 -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding -nostdinc \
               -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
               -I../../ntos/inc/ppc -I../../ntos/inc -I../../ntdll/ppc \
@@ -194,12 +194,52 @@ jobs:
               -c ../../ntos/config/$f.c -o obj_le/config_$f.o
           done
 
+          # Compile Process/Thread module (PsCreateSystemThread)
+          for f in pscreate psexit pslist; do
+            powerpc64le-linux-gnu-gcc -m32 -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding -nostdinc \
+              -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
+              -I../../ntos/inc/ppc -I../../ntos/inc -I../../ntdll/ppc \
+              -I./inc_stub \
+              -c ../../ntos/ps/$f.c -o obj_le/ntos_ps_$f.o
+          done
+
+          # Compile Object Manager module
+          for f in obcreate obname; do
+            powerpc64le-linux-gnu-gcc -m32 -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding -nostdinc \
+              -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
+              -I../../ntos/inc/ppc -I../../ntos/inc -I../../ntdll/ppc \
+              -I./inc_stub \
+              -c ../../ntos/ob/$f.c -o obj_le/ntos_ob_$f.o
+          done
+
+          # Compile LPC module
+          for f in lpc lpcport; do
+            powerpc64le-linux-gnu-gcc -m32 -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding -nostdinc \
+              -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
+              -I../../ntos/inc/ppc -I../../ntos/inc -I../../ntdll/ppc \
+              -I./inc_stub \
+              -c ../../ntos/lpc/$f.c -o obj_le/ntos_lpc_$f.o
+          done
+
+          # Compile Command shell module (CmdMain)
+          for f in cmdmain cmds console; do
+            powerpc64le-linux-gnu-gcc -m32 -mcpu=750 -mno-altivec -Wall -Werror -O2 -ffreestanding -nostdinc \
+              -DPOWERPC -D_G3_ -DBROADWAY -DNT_UP -DNT_KERNEL -D_NTSYSTEM_ \
+              -I../../ntos/inc/ppc -I../../ntos/inc -I../../ntdll/ppc \
+              -I./inc_stub \
+              -c ../../ntos/cmd/cmd/$f.c -o obj_le/ntos_cmd_$f.o
+          done
+
           # Link ELF32 little-endian executable
           powerpc64le-linux-gnu-ld -m elf32lppc -Ttext 0x00000000 -nostdlib -static \
             -o ntoskrnl_le.elf \
-            obj_le/hal_halppc.o obj_le/hal_atomic.o obj_le/hal_interrupt.o obj_le/hal_context.o obj_le/hal_of.o obj_le/hal_display.o obj_le/hal_font8x8.o obj_le/hal_pad.o \
+            obj_le/hal_halppc.o obj_le/hal_atomic.o obj_le/hal_interrupt.o obj_le/hal_context.o obj_le/hal_of.o obj_le/hal_display.o obj_le/hal_font8x8.o obj_le/hal_pad.o obj_le/hal_disk.o obj_le/hal_fat.o \
             obj_le/ntdll_context.o obj_le/ntdll_dispatch.o obj_le/ntdll_critsect.o obj_le/ntdll_ldrctx.o obj_le/ntdll_ldrthunk.o obj_le/ntdll_npxnp.o \
             obj_le/config_cmregistry.o obj_le/config_cmkey.o obj_le/config_cmvalue.o obj_le/config_cmcallback.o \
+            obj_le/ntos_ps_pscreate.o obj_le/ntos_ps_psexit.o obj_le/ntos_ps_pslist.o \
+            obj_le/ntos_ob_obcreate.o obj_le/ntos_ob_obname.o \
+            obj_le/ntos_lpc_lpc.o obj_le/ntos_lpc_lpcport.o \
+            obj_le/ntos_cmd_cmdmain.o obj_le/ntos_cmd_cmds.o obj_le/ntos_cmd_console.o \
             obj_le/ppcinit.o obj_le/exceptn.o obj_le/pcr.o obj_le/ntos_ppc.o obj_le/ntoskrnl.o obj_le/ntos_entry.o
 
           powerpc64le-linux-gnu-readelf -h ntoskrnl_le.elf | grep -E "Class|Data|Machine|Type|Entry"
@@ -213,36 +253,34 @@ jobs:
           mkdir -p wii_sd/apps/arcldr
           cp entii/arcldr/arcldr_rvl.dol wii_sd/apps/arcldr/boot.dol
           cp winxp_source/Source/XPSP1/NT/base/build/ppc/ntoskrnl_le.elf wii_sd/nt/arcfw.elf
-          cat > wii_sd/README.md << 'EOF'
-# Wii SD Card Layout for XP Kernel Testing
-
-## Files on SD card:
-
-sd:/apps/arcldr/boot.dol   - entii arcldr loader (load via Homebrew Channel)
-sd:/nt/arcfw.elf           - XP kernel (little-endian ELF, entry via ModeSwitchEntry)
-
-## How to test:
-
-1. Copy the `wii_sd/` contents to the root of a FAT32 SD card.
-2. Insert the SD card into your Wii.
-3. Launch the Homebrew Channel.
-4. Run `arcldr` from the Homebrew Channel.
-5. arcldr will load `sd:/nt/arcfw.elf`, build the PHW_DESCRIPTION from your Wii's
-   hardware, and jump to the XP kernel's `_start` via `ModeSwitchEntry`.
-
-## What to expect:
-
-- No visible output yet (no framebuffer/display driver in the kernel).
-- The kernel initializes and spins waiting for interrupts.
-- If the Wii doesn't immediately crash/reboot, the entry convention and
-  PHW_DESCRIPTION plumbing are working.
-
-## Notes:
-
-- This is experimental early code. The kernel may hang or crash.
-- arcldr requires a Wii with Homebrew Channel installed.
-- The kernel expects entii's PHW_DESCRIPTION loader block in GPR r3.
-EOF
+          printf '%s\n' '# Wii SD Card Layout for XP Kernel Testing' > wii_sd/README.md
+          printf '%s\n' '' >> wii_sd/README.md
+          printf '%s\n' '## Files on SD card:' >> wii_sd/README.md
+          printf '%s\n' '' >> wii_sd/README.md
+          printf '%s\n' 'sd:/apps/arcldr/boot.dol   - entii arcldr loader (load via Homebrew Channel)' >> wii_sd/README.md
+          printf '%s\n' 'sd:/nt/arcfw.elf           - XP kernel (little-endian ELF, entry via ModeSwitchEntry)' >> wii_sd/README.md
+          printf '%s\n' '' >> wii_sd/README.md
+          printf '%s\n' '## How to test:' >> wii_sd/README.md
+          printf '%s\n' '' >> wii_sd/README.md
+          printf '%s\n' '1. Copy the `wii_sd/` contents to the root of a FAT32 SD card.' >> wii_sd/README.md
+          printf '%s\n' '2. Insert the SD card into your Wii.' >> wii_sd/README.md
+          printf '%s\n' '3. Launch the Homebrew Channel.' >> wii_sd/README.md
+          printf '%s\n' '4. Run `arcldr` from the Homebrew Channel.' >> wii_sd/README.md
+          printf '%s\n' '5. arcldr will load `sd:/nt/arcfw.elf`, build the PHW_DESCRIPTION from your Wii'\''s' >> wii_sd/README.md
+          printf '%s\n' '   hardware, and jump to the XP kernel'\''s `_start` via `ModeSwitchEntry`.' >> wii_sd/README.md
+          printf '%s\n' '' >> wii_sd/README.md
+          printf '%s\n' '## What to expect:' >> wii_sd/README.md
+          printf '%s\n' '' >> wii_sd/README.md
+          printf '%s\n' '- No visible output yet (no framebuffer/display driver in the kernel).' >> wii_sd/README.md
+          printf '%s\n' '- The kernel initializes and spins waiting for interrupts.' >> wii_sd/README.md
+          printf '%s\n' '- If the Wii doesn'\''t immediately crash/reboot, the entry convention and' >> wii_sd/README.md
+          printf '%s\n' '  PHW_DESCRIPTION plumbing are working.' >> wii_sd/README.md
+          printf '%s\n' '' >> wii_sd/README.md
+          printf '%s\n' '## Notes:' >> wii_sd/README.md
+          printf '%s\n' '' >> wii_sd/README.md
+          printf '%s\n' '- This is experimental early code. The kernel may hang or crash.' >> wii_sd/README.md
+          printf '%s\n' '- arcldr requires a Wii with Homebrew Channel installed.' >> wii_sd/README.md
+          printf '%s\n' '- The kernel expects entii'\''s PHW_DESCRIPTION loader block in GPR r3.' >> wii_sd/README.md
           echo "=== Package complete ==="
           ls -la wii_sd/ wii_sd/apps/arcldr/ wii_sd/nt/
 

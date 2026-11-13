@@ -138,6 +138,37 @@ KeInitializeKernelPpc(
     HalpControllerInit();
     HalpDisplayPrintf("Controller input initialized.\r\n");
 
+    /* Initialize the SD card block device and mount the FAT volume. */
+    {
+        HalpDisplayPrintf("Initializing SD card...\r\n");
+        if (HalpSdInit()) {
+            ULONG sectors = HalpSdGetSectorCount();
+            ULONG sectorSize = HalpSdGetSectorSize();
+            HalpDisplayPrintf("SD card initialized: %lu sectors x %lu bytes\r\n",
+                              sectors, sectorSize);
+
+            if (HalpFatInit()) {
+                HalpDisplayPrintf("FAT volume mounted.\r\n");
+
+                /* Probe for a test file on the SD card. */
+                {
+                    ULONG fileSize = 0;
+                    ULONG startCluster = 0;
+                    if (HalpFatOpen("\\nt\\arcfw.elf", &fileSize, &startCluster)) {
+                        HalpDisplayPrintf("Found \\nt\\arcfw.elf (%lu bytes, cluster %lu)\r\n",
+                                          fileSize, startCluster);
+                    } else {
+                        HalpDisplayPrintf("\\nt\\arcfw.elf not found on SD card.\r\n");
+                    }
+                }
+            } else {
+                HalpDisplayPrintf("FAT volume mount failed.\r\n");
+            }
+        } else {
+            HalpDisplayPrintf("SD card init failed.\r\n");
+        }
+    }
+
     /* Initialize the config registry (HKLM\HARDWARE, SYSTEM, SOFTWARE). */
     {
         NTSTATUS cmStatus = CmInitializeConfigRegistry(LoaderBlock);

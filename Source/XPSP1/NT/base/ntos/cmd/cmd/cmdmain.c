@@ -50,6 +50,26 @@ CmdDispatchLine(
     );
 
 VOID
+ConsoleReadLine(
+    VOID
+    );
+
+PCHAR
+CmdGetLine(
+    VOID
+    );
+
+ULONG
+CmdGetLineLen(
+    VOID
+    );
+
+VOID
+CmdClearLine(
+    VOID
+    );
+
+VOID
 CmdInitializeConsole(
     VOID
     );
@@ -70,6 +90,10 @@ CmdMain(
     IN PVOID StartContext
     )
 {
+    NTSTATUS Status;
+    PCHAR CmdLine;
+    ULONG CmdLineLen;
+
     UNREFERENCED_PARAMETER(StartContext);
 
     CmdInitializeConsole();
@@ -78,12 +102,29 @@ CmdMain(
     HalpDisplayPrintf("(C) Copyright 1985-2001 Microsoft Corp.\r\n");
     HalpDisplayPrintf("\r\n");
 
-    /* Simple REPL loop.  Reads a line, dispatches it, prints the result. */
+    /* Simple REPL loop.  Reads a line from the gamepad-driven console,
+     * dispatches it to the command dispatcher, prints the result, and
+     * loops.  Because this port has no scheduler yet, the shell thread
+     * owns the CPU while in ConsoleReadLine (blocking polling read). */
     for (;;) {
         HalpDisplayPrintf("C:\\> ");
-        /* Line reading and dispatch is implemented in console.c / cmds.c.
-         * For now the shell idles here after printing the prompt. */
-        HalpPutChar('\r');
+
+        /* Block until the user presses Enter on the controller. */
+        ConsoleReadLine();
+
+        CmdLine    = CmdGetLine();
+        CmdLineLen = CmdGetLineLen();
+
+        /* Dispatch the command line. */
+        Status = CmdDispatchLine(CmdLine, CmdLineLen);
+
+        /* Clear the input buffer for the next line. */
+        CmdClearLine();
+
+        /* Print a result line for non-trivial statuses. */
+        if (!NT_SUCCESS(Status) && Status != STATUS_NOT_IMPLEMENTED) {
+            HalpDisplayPrintf("Command failed: 0x%08X\r\n", Status);
+        }
     }
 
     /* Unreachable (no exit path in the minimal shell yet). */

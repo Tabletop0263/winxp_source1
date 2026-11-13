@@ -38,7 +38,7 @@ ELF    := ntoskrnl.elf
 HAL_OBJS := $(OBJDIR)/hal_halppc.o $(OBJDIR)/hal_atomic.o \
             $(OBJDIR)/hal_interrupt.o $(OBJDIR)/hal_context.o \
             $(OBJDIR)/hal_of.o $(OBJDIR)/hal_display.o $(OBJDIR)/hal_font.o \
-            $(OBJDIR)/hal_pad.o
+            $(OBJDIR)/hal_pad.o $(OBJDIR)/hal_disk.o $(OBJDIR)/hal_fat.o
 
 NTDLL_OBJS := $(OBJDIR)/ntdll_context.o $(OBJDIR)/ntdll_dispatch.o \
               $(OBJDIR)/ntdll_critsect.o $(OBJDIR)/ntdll_ldrctx.o \
@@ -96,6 +96,12 @@ $(OBJDIR)/hal_font.o: $(HAL)/font8x8.c | $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OBJDIR)/hal_pad.o: $(HAL)/pad.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR)/hal_disk.o: $(HAL)/disk.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR)/hal_fat.o: $(HAL)/fat.c | $(OBJDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OBJDIR)/ntdll_context.o: $(NTDLL)/context.c | $(OBJDIR)
