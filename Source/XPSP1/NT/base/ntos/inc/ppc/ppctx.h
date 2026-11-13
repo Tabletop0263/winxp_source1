@@ -350,12 +350,34 @@ VOID HalpSetColors(IN ULONG FgColor, IN ULONG BgColor);
 VOID HalpDisplayPrintf(IN const CHAR *Fmt, ...);
 
 /*--------------------------------------------------------------------------
+    Blink indicator (hals/halppc/ppc/display.c).
+
+    Called once per Decrementer tick to draw a flashing block at the
+    top-left corner of the framebuffer, so a human can tell the kernel
+    is running even when there is no other visible output.
+--------------------------------------------------------------------------*/
+VOID HalpDisplayTickBlink(VOID);
+
+/*--------------------------------------------------------------------------
     Controller input (hals/halppc/ppc/pad.c).
 --------------------------------------------------------------------------*/
 typedef struct _CONTROLLER_STATE CONTROLLER_STATE, *PCONTROLLER_STATE;
 VOID HalpControllerInit(VOID);
 VOID HalpGetControllerState(OUT PCONTROLLER_STATE State);
 ULONG HalpControllerMapButton(IN ULONG PadButtons);
+
+/*--------------------------------------------------------------------------
+    Interrupt dispatch (hals/halppc/ppc/interrupt.c).
+--------------------------------------------------------------------------*/
+BOOLEAN HalConnectInterrupt(IN ULONG Vector, IN VOID (*Handler)(VOID));
+
+/*--------------------------------------------------------------------------
+    Decrementer tick ISR (hals/halppc/ppc/interrupt.c).
+
+    Registered via HalConnectInterrupt(0x900, ...) to drive the blink
+    indicator on each Decrementer tick.
+--------------------------------------------------------------------------*/
+VOID HalpDecrementerHandler(VOID);
 
 /*--------------------------------------------------------------------------
     SD card block device (hals/halppc/ppc/disk.c).

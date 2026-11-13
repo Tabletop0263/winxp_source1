@@ -78,6 +78,12 @@ static __inline__ void __set_SRR1(ULONG val)
  */
 VOID KiExceptionDispatch(IN PKTRAP_FRAME TrapFrame);
 
+/* Decrementer / Timebase SPR */
+#define SPR_DECREMENTER  22
+
+/* PowerPC exception vector numbers (from ppctx.h / ppc.S). */
+#define PPC_VEC_DECREMENTER  0x900   /* Decrementer timer tick */
+
 /*
  * Per-CPU interrupt state tracking.
  * In a real port this would be in the PCR (Processor Control Region).
@@ -100,6 +106,29 @@ static VOID
 HalpDefaultInterruptHandler(VOID)
 {
     /* Stubs: log and ignore in this port */
+    HalpInterruptCount++;
+}
+
+/*
+ * HalpDecrementerHandler - ISR for the Decrementer vector (0x900).
+ *
+ * The Decrementer fires at ~100 Hz.  On each tick we:
+ *   1. Reload the Decrementer so it keeps firing periodically.
+ *   2. Draw the blink indicator (top-left corner block toggles ~once/sec)
+ *      so a human can tell the kernel is running.
+ *
+ * This deliberately does NOT call KiExceptionDispatch: timer ticks are
+ * not exceptions and would otherwise trigger a bugcheck.
+ */
+VOID
+HalpDecrementerHandler(VOID)
+{
+    /* Reload the Decrementer for the next tick (~10 ms at 100 Hz). */
+    HalpSetSPR(SPR_DECREMENTER, 0x00989680UL);   /* 10,000,000 @ 1 GHz bus/4 */
+
+    /* Draw the blink indicator (toggles ~once per second internally). */
+    HalpDisplayTickBlink();
+
     HalpInterruptCount++;
 }
 
@@ -183,6 +212,16 @@ HalpInterruptEntry(IN ULONG Vector, IN PKTRAP_FRAME TrapFrame)
                         KiExceptionDispatch once kernel dispatch is wired */
 
     prev = HalBeginInterrupt();
+
+    /* Decrementer vector (0x900): timer tick drives the blink indicator.
+     * Timer ticks are not exceptions - do NOT call KiExceptionDispatch.
+     * Route directly to HalpDecrementerHandler instead of the dispatch
+     * table / default handler path. */
+    if (Vector == PPC_VEC_DECREMENTER) {
+        HalpDecrementerHandler();
+        HalEndInterrupt(prev);
+        return;
+    }
 
     if (Vector < MAX_INTERRUPT_VECTORS) {
         handler = HalpInterruptDispatchTable[Vector];

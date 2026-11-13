@@ -255,6 +255,60 @@ HalpSetColors(
 }
 
 /*--------------------------------------------------------------------------
+    Blink indicator - draws a flashing block at the top-left corner of the
+    framebuffer so a human can tell the kernel is running even when there
+    is no other visible output.
+
+    Drawn every Decrementer tick (100 Hz).  The block toggles on/off once
+    per second (~100 ticks) by counting ticks internally.
+--------------------------------------------------------------------------*/
+static volatile ULONG HalpBlinkTickCount = 0;
+static volatile BOOLEAN HalpBlinkVisible = FALSE;
+
+/* Draw a solid colored block (filled square) at screen pixel coords. */
+static VOID
+HalpDrawBlinkBlock(
+    IN ULONG X,
+    IN ULONG Y,
+    IN ULONG Size,
+    IN BOOLEAN On
+    )
+{
+    ULONG color = On ? HalpFgColor : HalpBgColor;
+    ULONG row, col;
+
+    if (HalpFrameBuffer == NULL) {
+        return;
+    }
+
+    for (row = Y; row < Y + Size && row < HalpFrameBufferHeight; row++) {
+        for (col = X; col < X + Size && col < HalpFrameBufferWidth; col++) {
+            HalpPixelWrite(col, row, color);
+        }
+    }
+}
+
+/* Called once per Decrementer tick (100 Hz). Toggles the blink block
+ * once per second (~100 ticks). Callers must not call from interrupt
+ * context without IRQL considerations; this port runs single-core and
+ * the Decrementer ISR calls this directly. */
+VOID
+HalpDisplayTickBlink(VOID)
+{
+    /* Draw previous state erased (XOR with background), then toggle. */
+    HalpDrawBlinkBlock(8, 8, 24, HalpBlinkVisible);
+
+    HalpBlinkTickCount++;
+    if (HalpBlinkTickCount >= 100) {   /* ~1 second at 100 Hz */
+        HalpBlinkTickCount = 0;
+        HalpBlinkVisible = (BOOLEAN)!HalpBlinkVisible;
+    }
+
+    /* Draw new state. */
+    HalpDrawBlinkBlock(8, 8, 24, HalpBlinkVisible);
+}
+
+/*--------------------------------------------------------------------------
     HalpDisplayPrintf - minimal printf-like formatted output.
 
     Supports %s, %c, %d, %u, %x, %p, %%. No floating point.

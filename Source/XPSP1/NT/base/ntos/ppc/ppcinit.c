@@ -204,6 +204,11 @@ KeInitializeKernelPpc(
         HalpInitializeDecrementer(HalpGetClockFrequency());
     }
 
+    /* Register the Decrementer tick ISR (vector 0x900) that drives the
+     * blink indicator so a human can tell the kernel is running on real
+     * Wii hardware. */
+    HalConnectInterrupt(0x900, HalpDecrementerHandler);
+
     /* Start the Windows shell (cmd.exe analog) as the initial system
      * thread.  PsCreateSystemThread runs the start routine immediately on
      * this processor (this port has no scheduler yet), so CmdMain will
