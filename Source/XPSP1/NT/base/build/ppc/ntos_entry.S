@@ -140,12 +140,15 @@ _start:
         # ------------------------------------------------------------------
         # Set up a stack pointer (GPR r1) if arcldr did not provide one.
         # PowerPC ABI: stack grows down; r1 must be 16-byte aligned.
-        # We place the stack just below the kernel image end (_end symbol).
+        # We place the stack just ABOVE the kernel image end (_end symbol)
+        # so stack pushes (which grow downward) cannot corrupt .bss data.
+        # Placing it BELOW _end would land inside .bss and corrupt kernel
+        # state -> instant crash on real hardware.
         # If arcldr already left a usable stack in r1, this is harmless.
         # ------------------------------------------------------------------
         lis     1, _end@ha
         addi    1, 1, _end@l
-        addi    1, 1, -0x4000     # 16 KiB stack below _end (16-byte aligned)
+        addi    1, 1, 0x4000      # 16 KiB stack above _end (16-byte aligned)
 
         # Load PCR address into GPR r2 (TOC/global pointer convention)
         lis     3, HalpPcrStorage@ha
