@@ -137,6 +137,16 @@ _start:
         addi    4, 4, KeLoaderBlock@l
         stw     3, 0(4)           # *KeLoaderBlock = r3 (loader block pointer)
 
+        # ------------------------------------------------------------------
+        # Set up a stack pointer (GPR r1) if arcldr did not provide one.
+        # PowerPC ABI: stack grows down; r1 must be 16-byte aligned.
+        # We place the stack just below the kernel image end (_end symbol).
+        # If arcldr already left a usable stack in r1, this is harmless.
+        # ------------------------------------------------------------------
+        lis     1, _end@ha
+        addi    1, 1, _end@l
+        addi    1, 1, -0x4000     # 16 KiB stack below _end (16-byte aligned)
+
         # Load PCR address into GPR r2 (TOC/global pointer convention)
         lis     3, HalpPcrStorage@ha
         addi    3, 3, HalpPcrStorage@l
@@ -170,3 +180,6 @@ _start_entry:
         .word   _start
 
         .text
+        # _end is defined by the linker; mark the end of the kernel image.
+        .globl  _end
+_end:

@@ -24,14 +24,19 @@
 #include "ppctx.h"
 
 /*--------------------------------------------------------------------------
-    Broadway SI (Serial Interface) register base (gamepad/EXI channel 0).
+    Broadway SI (Serial Interface) register base (gamepad).
+
+    NOTE: On Broadway/G3, EXI2 (SD card) is at 0xCD006400 and SI (Serial
+    Interface / gamepad) is at 0xCD006000.  These must not collide -- the
+    previous 0xCD006400 base overlapped EXI2 and corrupted SD registers
+    before HalpSdInit() ran, causing an instant crash on real hardware.
 --------------------------------------------------------------------------*/
-#define SI_BASE            ((volatile unsigned long *)0xCD006400UL)
-#define SI_REG_STATUS      SI_BASE[0]   /* 0xCD006400 */
-#define SI_REG_DATA        SI_BASE[1]   /* 0xCD006404 */
-#define SI_REG_CONTROL     SI_BASE[2]   /* 0xCD006408 */
-#define SI_REG_BAUD        SI_BASE[3]   /* 0xCD00640C */
-#define SI_REG_INTERRUPT   SI_BASE[4]   /* 0xCD006410 */
+#define SI_BASE            ((volatile unsigned long *)0xCD006000UL)
+#define SI_REG_STATUS      SI_BASE[0]   /* 0xCD006000 */
+#define SI_REG_DATA        SI_BASE[1]   /* 0xCD006004 */
+#define SI_REG_CONTROL     SI_BASE[2]   /* 0xCD006008 */
+#define SI_REG_BAUD        SI_BASE[3]   /* 0xCD00600C */
+#define SI_REG_INTERRUPT   SI_BASE[4]   /* 0xCD006010 */
 
 /* SI status register bits. */
 #define SI_STATUS_BUSY     0x00000001UL /* SI busy transferring */
